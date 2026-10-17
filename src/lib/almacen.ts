@@ -1,7 +1,7 @@
 import { esColorMateria, siguienteColor, type ColorMateria } from './colores.ts';
 import { nuevoId } from './datos.ts';
 import { aIsoBogota, esIsoBogota } from './fechas.ts';
-import type { Datos, DriveLink, Entrega, Materia } from './tipos.ts';
+import type { Datos, DriveLink, Entrega, Materia, SeccionEnlace } from './tipos.ts';
 
 export const CLAVE = 'mi-u-v1';
 export const CLAVE_CORRUPTO = 'mi-u-v1-corrupto';
@@ -81,7 +81,7 @@ function localStorageDelNavegador(): AlmacenWeb | null {
 
 function estadoInicial(): Datos {
   return {
-    materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '' }))),
+    materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '', ocultaEn: [] }))),
     entregas: [],
     drive: [],
   };
@@ -112,7 +112,7 @@ export function interpretar(crudo: string): Datos | null {
     const { materias, drive } = valor;
     const entregas = Array.isArray(valor.entregas) ? valor.entregas.map(migrarEntrega) : null;
     if (!esLista(materias, esMateriaGuardada) || !esLista(entregas, esEntrega) || !esLista(drive, esDriveLink)) return null;
-    return { ...valor, materias: asignarColores(materias), entregas, drive };
+    return { ...valor, materias: asignarColores(materias.map(migrarMateria)), entregas, drive };
   } catch {
     // JSON mal formado, o una fecha en milisegundos fuera de rango.
     return null;
@@ -128,6 +128,11 @@ function asignarColores<T extends Record<string, unknown>>(materias: T[]): (T & 
     usados.push(color);
     return { ...m, color };
   });
+}
+
+/** Las materias guardadas antes de poder quitarlas de una sección no traen ocultaEn: no están ocultas en ninguna. */
+function migrarMateria<T extends { ocultaEn?: SeccionEnlace[] }>(materia: T): T & { ocultaEn: SeccionEnlace[] } {
+  return { ...materia, ocultaEn: materia.ocultaEn ?? [] };
 }
 
 /** mi-u.html guardaba la fecha en milisegundos; ahora es texto ISO con el desfase de Bogotá. */
@@ -147,9 +152,23 @@ function tieneTextos(valor: Record<string, unknown>, campos: string[]): boolean 
   return campos.every((campo) => typeof valor[campo] === 'string');
 }
 
-/** Una materia guardada; el color puede faltar (datos de mi-u.html) porque se asigna al cargar. */
-function esMateriaGuardada(valor: unknown): valor is Omit<Materia, 'color'> & { color?: unknown } {
-  return esObjeto(valor) && tieneTextos(valor, ['id', 'nombre', 'clase', 'moodle', 'classroom']);
+/**
+ * Una materia guardada. El color puede faltar (datos de mi-u.html) porque se asigna al cargar, y ocultaEn
+ * (datos anteriores) porque empieza vacío; si está, solo puede nombrar las tres secciones de enlaces.
+ */
+function esMateriaGuardada(valor: unknown): valor is Omit<Materia, 'color' | 'ocultaEn'> & { color?: unknown; ocultaEn?: SeccionEnlace[] } {
+  return (
+    esObjeto(valor) &&
+    tieneTextos(valor, ['id', 'nombre', 'clase', 'moodle', 'classroom']) &&
+    (valor.ocultaEn === undefined || esLista(valor.ocultaEn, esSeccionEnlace))
+  );
+}
+
+// Record obliga a listar todas las secciones del tipo.
+const SECCIONES: Record<SeccionEnlace, true> = { clase: true, moodle: true, classroom: true };
+
+function esSeccionEnlace(valor: unknown): valor is SeccionEnlace {
+  return typeof valor === 'string' && Object.hasOwn(SECCIONES, valor);
 }
 
 function esEntrega(valor: unknown): valor is Entrega {
