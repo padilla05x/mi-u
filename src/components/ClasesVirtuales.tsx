@@ -1,11 +1,14 @@
 import { Video } from 'lucide-react';
 import EnlacesPorMateria, { type PropsSeccionEnlaces } from './EnlacesPorMateria.tsx';
-import Tarjeta from './Tarjeta.tsx';
 
-export default function ClasesVirtuales({ className, ...props }: PropsSeccionEnlaces) {
+export default function ClasesVirtuales(props: PropsSeccionEnlaces) {
   return (
-    <Tarjeta titulo="Clases virtuales" pista="Enlace de Meet, Zoom o Teams de cada materia." icono={Video} className={className}>
-      <EnlacesPorMateria {...props} campo="clase" />
-    </Tarjeta>
+    <EnlacesPorMateria
+      {...props}
+      seccion="clase"
+      titulo="Clases virtuales"
+      pista="Enlace de Meet, Zoom o Teams de cada materia."
+      icono={Video}
+    />
   );
 }

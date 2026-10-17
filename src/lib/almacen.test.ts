@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { storageFalso } from '../test/storage-falso.ts';
 import { abrirAlmacen, CLAVE, CLAVE_CORRUPTO, type AlmacenWeb } from './almacen.ts';
 import { COLORES_MATERIA } from './colores.ts';
-import type { Datos } from './tipos.ts';
+import type { Datos, Materia } from './tipos.ts';
 
 const MATERIAS_BASE = [
   'Infraestructura Computacional',
@@ -15,7 +15,7 @@ const MATERIAS_BASE = [
 ];
 
 const datosNuevos: Datos = {
-  materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea', clase: 'https://meet.google.com/abc', moodle: '', classroom: '' }],
+  materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea', clase: 'https://meet.google.com/abc', moodle: '', classroom: '', ocultaEn: [] }],
   entregas: [{ id: 'e1', materia: 'm1', texto: 'Taller 3', fecha: '2026-10-20T20:00:00-05:00', hecha: false, avisada: false }],
   drive: [{ id: 'd1', nombre: 'Carpeta de PETI', url: 'https://drive.google.com/drive/folders/abc' }],
 };
@@ -80,6 +80,8 @@ describe('abrirAlmacen', () => {
     ['materia sin nombre', JSON.stringify({ ...datosNuevos, materias: [{ id: 'm1', clase: '', moodle: '', classroom: '' }] })],
     ['fecha que no existe', JSON.stringify({ ...datosNuevos, entregas: [{ ...datosNuevos.entregas[0], fecha: '2026-02-30T10:00:00-05:00' }] })],
     ['"hecha" no es booleano', JSON.stringify({ ...datosNuevos, entregas: [{ ...datosNuevos.entregas[0], hecha: 'no' }] })],
+    ['ocultaEn nombra una sección que no existe', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], ocultaEn: ['drive'] }] })],
+    ['ocultaEn no es una lista', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], ocultaEn: 'moodle' }] })],
   ])('forma incorrecta (%s): copia, estado inicial y aviso', (_caso, crudo) => {
     const storage = storageFalso({ [CLAVE]: crudo });
     const { datos, aviso } = abrirAlmacen(storage);
@@ -142,6 +144,30 @@ describe('abrirAlmacen', () => {
 
     expect(almacen.aviso).toBeNull();
     expect(almacen.guardar(datosNuevos)).toMatch(/está lleno/);
+  });
+});
+
+describe('secciones ocultas al cargar', () => {
+  it('las materias guardadas sin ocultaEn reciben [] y el formato nuevo se guarda al primer cambio', () => {
+    const vieja: Partial<Materia> = { ...datosNuevos.materias[0] };
+    delete vieja.ocultaEn;
+    const crudo = JSON.stringify({ ...datosNuevos, materias: [vieja, { ...vieja, id: 'm2', nombre: 'Física' }] });
+    const storage = storageFalso({ [CLAVE]: crudo });
+    const almacen = abrirAlmacen(storage);
+
+    expect(almacen.aviso).toBeNull();
+    expect(almacen.datos.materias.map((m) => m.ocultaEn)).toEqual([[], []]);
+    expect(almacen.datos.materias[0]).toEqual(datosNuevos.materias[0]);
+    expect(storage.valores.get(CLAVE)).toBe(crudo); // Cargar no escribe nada.
+
+    almacen.guardar(almacen.datos);
+    expect(JSON.parse(storage.valores.get(CLAVE)!).materias.map((m: Materia) => m.ocultaEn)).toEqual([[], []]);
+  });
+
+  it('conserva ocultaEn de los datos que ya lo tienen', () => {
+    const nuevos: Datos = { ...datosNuevos, materias: [{ ...datosNuevos.materias[0], clase: '', ocultaEn: ['clase', 'classroom'] }] };
+    const storage = storageFalso({ [CLAVE]: JSON.stringify(nuevos) });
+    expect(abrirAlmacen(storage)).toMatchObject({ datos: nuevos, aviso: null });
   });
 });
 

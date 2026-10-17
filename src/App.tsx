@@ -24,10 +24,11 @@ import {
   nombreMateria,
   quitarDrive,
   quitarMateria,
-  type CampoEnlace,
 } from './lib/datos.ts';
 import { resumenEntregas } from './lib/entregas.ts';
+import { mostrarEnSeccion, quitarDeSeccion } from './lib/secciones.ts';
 import type { Store } from './lib/store.ts';
+import type { SeccionEnlace } from './lib/tipos.ts';
 
 export default function App({ store }: { store: Store }) {
   const { datos, avisos, deshacer } = useSyncExternalStore(store.suscribir, store.obtener);
@@ -38,8 +39,13 @@ export default function App({ store }: { store: Store }) {
   const avisosNavegador = useAvisos(datos.entregas, nombreDe, (ids) =>
     store.actualizarSinDeshacer((d) => marcarAvisadas(d, ids)),
   );
-  const guardarEnlaceDe = (id: string, campo: CampoEnlace, url: string) =>
-    store.actualizar((d) => guardarEnlace(d, id, campo, url));
+  // Lo mismo para Clases virtuales, Moodle y Classroom; cada tarjeta indica su sección.
+  const seccionEnlaces = {
+    materias: datos.materias,
+    onGuardar: (id: string, seccion: SeccionEnlace, url: string) => store.actualizar((d) => guardarEnlace(d, id, seccion, url)),
+    onQuitar: (id: string, seccion: SeccionEnlace) => store.actualizar((d) => quitarDeSeccion(d, id, seccion)),
+    onMostrar: (id: string, seccion: SeccionEnlace) => store.actualizar((d) => mostrarEnSeccion(d, id, seccion)),
+  };
 
   return (
     <>
@@ -67,9 +73,9 @@ export default function App({ store }: { store: Store }) {
           onAlternar={(id) => store.actualizar((d) => alternarEntrega(d, id))}
           onBorrar={(id) => store.actualizar((d) => borrarEntrega(d, id), 'Entrega borrada')}
         />
-        <ClasesVirtuales className="lg:col-span-2" materias={datos.materias} onGuardar={guardarEnlaceDe} />
-        <AulaMoodle className="lg:col-span-2" materias={datos.materias} onGuardar={guardarEnlaceDe} />
-        <Classroom className="lg:col-span-2" materias={datos.materias} onGuardar={guardarEnlaceDe} />
+        <ClasesVirtuales className="lg:col-span-2" {...seccionEnlaces} />
+        <AulaMoodle className="lg:col-span-2" {...seccionEnlaces} />
+        <Classroom className="lg:col-span-2" {...seccionEnlaces} />
         <Drive
           className="lg:col-span-3"
           enlaces={datos.drive}

@@ -3,7 +3,7 @@ import { moverMateria } from './datos.ts';
 import type { Datos } from './tipos.ts';
 
 const datos: Datos = {
-  materias: ['a', 'b', 'c'].map((id) => ({ id, nombre: id, color: 'orquidea', clase: '', moodle: '', classroom: '' })),
+  materias: ['a', 'b', 'c'].map((id) => ({ id, nombre: id, color: 'orquidea', clase: '', moodle: '', classroom: '', ocultaEn: [] })),
   entregas: [],
   drive: [],
 };

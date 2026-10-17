@@ -5,8 +5,8 @@ import type { Entrega, Materia } from './tipos.ts';
 const ahora = Date.parse('2026-10-14T09:00:00-05:00');
 
 const materias: Materia[] = [
-  { id: 'is', nombre: 'Ingeniería de Software', color: 'orquidea', clase: '', moodle: '', classroom: '' },
-  { id: 'pc', nombre: 'Programación Concurrente', color: 'oliva', clase: '', moodle: '', classroom: '' },
+  { id: 'is', nombre: 'Ingeniería de Software', color: 'orquidea', clase: '', moodle: '', classroom: '', ocultaEn: [] },
+  { id: 'pc', nombre: 'Programación Concurrente', color: 'oliva', clase: '', moodle: '', classroom: '', ocultaEn: [] },
 ];
 
 const entrega = (id: string, materia: string, texto: string, fecha: string, hecha = false): Entrega => ({

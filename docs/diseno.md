@@ -92,6 +92,7 @@ Una prueba de `npm test` lee este documento y los tokens reales de `src/index.cs
 | Anillo de foco | `foco` | `tarjeta` | 3 | 6,29 | 8,72 |
 | Anillo de foco | `foco` | `fondo` | 3 | 5,82 | 9,61 |
 | Anillo de foco en fila resaltada | `foco` | `superficie` | 3 | 5,66 | 7,96 |
+| Borde de tarjeta en modo edición | `acento` | `tarjeta` | 3 | 6,29 | 8,72 |
 
 Hay dos excepciones al contraste:
 - **Controles deshabilitados**, como "Abrir" sin enlace. WCAG excluye los componentes inactivos; se muestran con opacidad del 50 %.
@@ -234,7 +235,7 @@ La base es de 4 px. Los pasos son 4, 6, 8, 12, 16, 20, 24, 32 y 40 px.
 |---|---|
 | Tarjeta | 16 px |
 | Contador | 14 px |
-| Aviso del almacén y estado vacío | 12 px |
+| Aviso del almacén, estado vacío y chip de materia oculta | 12 px |
 | Campos, botones y botones de icono | 10 px |
 | Etiqueta de estado y punto de materia | Redondos (999 px) |
 
@@ -275,6 +276,8 @@ Son de Lucide (`lucide-react` 1.57) con trazo de 2 px:
 | Activar avisos del navegador | `BellRing` |
 | Estados de entrega | Ver "Estados de las entregas" |
 | Contadores | `CircleAlert`, `Clock` y `CalendarDays` |
+| Editar y Listo (modo edición) | `Pencil` y `Check` |
+| Mostrar una materia oculta y "todas ocultas" | `Eye` y `EyeOff` |
 | Aviso del almacén | `TriangleAlert` |
 | Estados vacíos | `ClipboardCheck` (Entregas), `BookPlus` (Mis materias y secciones de enlaces), `FolderPlus` (Drive) |
 | Botón "Ir a Mis materias" | `ArrowDown` (los demás botones de estado vacío usan `Plus`) |
@@ -407,6 +410,15 @@ Se usa antes de quitar una materia, porque también borra sus enlaces y entregas
 ### Mensajes de error
 
 Si falta un dato en un formulario (Entregas, Drive) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien.
+
+### Modo edición
+
+Clases virtuales, Aula virtual (Moodle) y Classroom tienen un botón secundario "Editar" (`Pencil`) a la derecha del título, para quitar de esa sección las materias que no la usan. Si no hay materias, no aparece.
+- **Estado de edición.** El botón pasa a "Listo" (`Check`) y el borde de la tarjeta pasa de `borde` a `acento` en 150 ms. La pista se reemplaza por "Quita una materia de esta sección. Su enlace se borra, pero la materia sigue en las demás.", unida a la tarjeta con `aria-describedby`. El relleno y el grosor del borde no cambian, así que la tarjeta no salta. Las filas y sus campos funcionan igual.
+- **Botón de quitar.** Cada fila suma, después de "Abrir", un botón de icono `Trash` con el nombre "Quitar {materia} de {sección}". En reposo va en `tenue`; al pasar el puntero o al enfocarlo con el teclado, en `peligro` sobre `peligro-suave`. Abre el diálogo de confirmación con "Cancelar" y "Quitar". Al confirmar se borra el enlace de esa sección, la fila sale de la lista y el foco pasa a "Listo".
+- **Ocultas aquí (N).** Solo en modo edición y si hay alguna, al final de la tarjeta y separada por una línea en `borde`. Cada materia es un chip (fondo `fondo`, borde `borde`) con su punto, su nombre y un botón secundario "Mostrar" (`Eye`). Al mostrarla vuelve a su lugar con el campo vacío, y el foco pasa a ese campo.
+- **Todas ocultas.** En modo normal, un recuadro como el de los estados vacíos, con `EyeOff`, dice "Todas las materias están ocultas en esta sección. Usa Editar para mostrarlas de nuevo."
+- **Datos.** Cada materia guarda en `ocultaEn` las secciones de las que se quitó. Sigue en las demás, en Entregas y en Mis materias; quitarla desde Mis materias la sigue borrando por completo.
 
 ## Pantallas de referencia
 
