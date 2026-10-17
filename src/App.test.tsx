@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
 import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION, type AlmacenWeb } from './lib/almacen.ts';
 import { crearStore } from './lib/store.ts';
-import type { Datos, Entrega, Materia, SeccionEnlace } from './lib/tipos.ts';
+import type { Bloque, Datos, Entrega, Materia, SeccionEnlace } from './lib/tipos.ts';
 import { storageFalso } from './test/storage-falso.ts';
 
 // Miércoles 14 de octubre de 2026, 9:00 a. m. en Bogotá.
@@ -37,8 +37,11 @@ const entrega = (id: string, materiaId: string, texto: string, fecha: string): E
   avisada: false,
 });
 
-function montar(datos?: Datos, storage: AlmacenWeb = storageFalso()) {
-  if (datos) storage.setItem(CLAVE, JSON.stringify(datos));
+/** Datos guardados para una prueba; sin horario, va vacío. */
+type DatosDePrueba = Omit<Datos, 'horario'> & Partial<Pick<Datos, 'horario'>>;
+
+function montar(datos?: DatosDePrueba, storage: AlmacenWeb = storageFalso()) {
+  if (datos) storage.setItem(CLAVE, JSON.stringify({ horario: [], ...datos }));
   const usuario = userEvent.setup();
   const vista = render(<App store={crearStore(abrirAlmacen(storage))} />);
   return { usuario, vista, guardado: (): Datos => JSON.parse(storage.getItem(CLAVE)!) };
@@ -675,7 +678,7 @@ describe('Estados vacíos', () => {
 });
 
 // Una entrega por estado el miércoles 14 de octubre a las 9:00: vencida, para hoy, mañana, en N días y entregada.
-const cincoEstados = (): Datos => ({
+const cincoEstados = (): DatosDePrueba => ({
   materias: [materia('m1', 'Ingeniería de Software'), materia('m2', 'Programación Concurrente')],
   entregas: [
     entrega('e1', 'm1', 'Parcial 1', '2026-10-13T18:00:00-05:00'),
@@ -984,6 +987,213 @@ describe('Orden de materias y atajos', () => {
     screen.getByLabelText('Descripción').blur();
     await usuario.keyboard('/');
     expect(screen.getByLabelText('Buscar entregas')).toHaveFocus();
+  });
+});
+
+describe('Hoy y Horario', () => {
+  // AHORA es miércoles (dia 2) a las 9:00 en Bogotá.
+  const bloqueDe = (id: string, materiaId: string, dia: Bloque['dia'], inicio: string, fin: string): Bloque => ({ id, materiaId, dia, inicio, fin });
+  const conHorario = (horario: Bloque[]) => ({
+    materias: [materia('fis', 'Física', { clase: 'meet.google.com/fis' }), materia('qui', 'Química'), materia('cal', 'Cálculo')],
+    entregas: [],
+    drive: [],
+    horario,
+  });
+  const semana = () =>
+    conHorario([
+      bloqueDe('b-qui', 'qui', 2, '14:00', '16:00'),
+      bloqueDe('b-fis', 'fis', 2, '08:00', '10:00'),
+      bloqueDe('b-cal', 'cal', 0, '10:00', '12:00'),
+    ]);
+  const clasesDeHoy = () => within(screen.getByRole('list', { name: 'Clases de hoy' })).getAllByRole('listitem');
+  /** La fila del Horario que se anuncia con esa frase (su texto oculto), o null. */
+  const filaDelHorario = (frase: string | RegExp) => within(seccion('Horario')).queryByText(frase)?.closest('li') ?? null;
+  /** Lo que el lector de pantalla lee del contenido: sin lo que tiene aria-hidden ni los botones, que se anuncian por su nombre. */
+  const textoLeido = (elemento: Element): string =>
+    [...elemento.childNodes]
+      .map((nodo) =>
+        nodo.nodeType === Node.TEXT_NODE
+          ? nodo.textContent
+          : nodo instanceof Element && nodo.getAttribute('aria-hidden') !== 'true' && nodo.tagName !== 'BUTTON'
+            ? textoLeido(nodo)
+            : '',
+      )
+      .join('');
+  const llenar = async (usuario: ReturnType<typeof userEvent.setup>, materiaNombre: string, dia: string, inicio: string, fin: string) => {
+    const horario = seccion('Horario');
+    await usuario.selectOptions(within(horario).getByLabelText('Materia'), materiaNombre);
+    await usuario.selectOptions(within(horario).getByLabelText('Día'), dia);
+    fireEvent.change(within(horario).getByLabelText('Inicio'), { target: { value: inicio } });
+    fireEvent.change(within(horario).getByLabelText('Fin'), { target: { value: fin } });
+    await usuario.click(within(horario).getByRole('button', { name: 'Agregar' }));
+  };
+
+  it('Hoy va justo después del encabezado y muestra las clases de hoy en orden de hora', () => {
+    montar(semana());
+    expect(screen.getAllByRole('region')[0]).toBe(seccion('Hoy'));
+    expect(seccion('Hoy')).toHaveTextContent('Tus clases del miércoles, según tu horario.');
+    const [primera, segunda, ...resto] = clasesDeHoy();
+    expect(resto).toEqual([]);
+    expect(primera).toHaveTextContent('08:00–10:00');
+    expect(primera).toHaveTextContent('Física');
+    expect(segunda).toHaveTextContent('14:00–16:00');
+    expect(segunda).toHaveTextContent('Química');
+    expect(seccion('Hoy')).not.toHaveTextContent('Cálculo'); // Es del lunes.
+  });
+
+  it('"Entrar" abre el enlace de clase virtual en otra pestaña, y sin enlace queda deshabilitado', () => {
+    montar(semana());
+    const [fisica, quimica] = clasesDeHoy();
+
+    const entrar = within(fisica).getByRole('link', { name: 'Entrar a la clase de Física' });
+    expect(entrar).toHaveTextContent('Entrar');
+    expect(entrar).toHaveAttribute('href', 'https://meet.google.com/fis');
+    expect(entrar).toHaveAttribute('target', '_blank');
+    expect(entrar).toHaveAttribute('rel', 'noopener noreferrer');
+
+    expect(within(quimica).queryByRole('link')).not.toBeInTheDocument();
+    const sinEnlace = within(quimica).getByRole('button', { name: 'Sin enlace para Química' });
+    expect(sinEnlace).toHaveTextContent('Sin enlace');
+    expect(sinEnlace).toBeDisabled();
+  });
+
+  it('"En curso" marca la clase que está ocurriendo y se quita al llegar su hora de fin', () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ now: new Date('2026-10-14T09:59:00-05:00'), toFake: ['Date', 'setInterval', 'clearInterval'] });
+    montar(semana());
+    const [fisica, quimica] = clasesDeHoy();
+    expect(within(fisica).getByText('En curso')).toBeInTheDocument();
+    expect(within(fisica).getByText('En curso').querySelector('svg')).toBeInTheDocument();
+    expect(within(quimica).queryByText('En curso')).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(60_000)); // 10:00: Física termina.
+    expect(screen.queryByText('En curso')).not.toBeInTheDocument();
+  });
+
+  it('sin clases hoy muestra un estado vacío amable, y su botón lleva al formulario de Horario', async () => {
+    const { usuario } = montar(conHorario([bloqueDe('b-cal', 'cal', 0, '10:00', '12:00')]));
+    const hoy = seccion('Hoy');
+    expect(within(hoy).getByText('Hoy no tienes clases')).toBeInTheDocument();
+    expect(hoy).toHaveTextContent('Aprovecha el día libre. Tu semana completa está en Horario.');
+    expect(screen.queryByRole('list', { name: 'Clases de hoy' })).not.toBeInTheDocument();
+
+    await usuario.click(within(hoy).getByRole('button', { name: 'Ir a Horario' }));
+    expect(within(seccion('Horario')).getByLabelText('Materia')).toHaveFocus();
+  });
+
+  it('sin horario lo invita a armarlo, y sin materias lleva primero a Mis materias', async () => {
+    montar(conHorario([]));
+    expect(seccion('Hoy')).toHaveTextContent('Agrega tu horario y aquí verás las clases de cada día, con su enlace para entrar.');
+    expect(within(seccion('Horario')).getByText('Todavía no tienes horario')).toBeInTheDocument();
+    cleanup();
+
+    const { usuario } = montar({ materias: [], entregas: [], drive: [] });
+    expect(within(seccion('Horario')).getByText('Primero agrega tus materias')).toBeInTheDocument();
+    expect(within(seccion('Horario')).queryByLabelText('Materia')).not.toBeInTheDocument();
+    await usuario.click(within(seccion('Hoy')).getByRole('button', { name: 'Ir a Mis materias' }));
+    expect(screen.getByLabelText('Nueva materia')).toHaveFocus();
+  });
+
+  it('agrega bloques agrupados por día y ordenados por hora, guarda el id de la materia y los muestra en Hoy', async () => {
+    const { usuario, guardado } = montar(conHorario([]));
+    const horario = seccion('Horario');
+
+    await llenar(usuario, 'Física', 'Miércoles', '08:00', '10:00');
+    await llenar(usuario, 'Química', 'Lunes', '10:00', '12:00');
+    await llenar(usuario, 'Física', 'Miércoles', '06:00', '07:00');
+
+    // Un grupo por día con bloques, de lunes a domingo.
+    const [lunes, miercoles, ...otros] = within(horario).getAllByRole('list');
+    expect(otros).toEqual([]);
+    expect(lunes).toBe(within(horario).getByRole('list', { name: 'Lunes' }));
+    expect(miercoles).toBe(within(horario).getByRole('list', { name: 'Miércoles' }));
+    expect(within(within(horario).getByRole('list', { name: 'Miércoles' })).getAllByRole('listitem').map(textoLeido)).toEqual([
+      'Física, miércoles de 06:00 a 07:00',
+      'Física, miércoles de 08:00 a 10:00',
+    ]);
+    expect(filaDelHorario('Química, lunes de 10:00 a 12:00')).toHaveTextContent('10:00–12:00');
+    expect(guardado().horario).toEqual([
+      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '08:00', fin: '10:00' },
+      { id: expect.any(String), materiaId: 'qui', dia: 0, inicio: '10:00', fin: '12:00' },
+      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '06:00', fin: '07:00' },
+    ]);
+    // Las horas se vacían; la materia y el día se quedan para la siguiente clase.
+    expect(within(horario).getByLabelText('Inicio')).toHaveValue('');
+    expect(within(horario).getByLabelText('Día')).toHaveDisplayValue('Miércoles');
+    // Hoy es miércoles: las dos de Física aparecen arriba.
+    expect(clasesDeHoy().map((li) => li.textContent)).toEqual([expect.stringContaining('06:00'), expect.stringContaining('08:00')]);
+  });
+
+  it('los errores de validarBloque salen en el mensaje de la tarjeta y no agregan nada', async () => {
+    const { usuario, guardado } = montar(conHorario([bloqueDe('b-fis', 'fis', 2, '08:00', '10:00')]));
+    const horario = seccion('Horario');
+    const antes = guardado().horario;
+
+    await usuario.click(within(horario).getByRole('button', { name: 'Agregar' }));
+    expect(within(horario).getByRole('alert')).toHaveTextContent('Completa la hora de inicio y la de fin.');
+
+    await llenar(usuario, 'Química', 'Miércoles', '10:00', '09:00');
+    expect(within(horario).getByRole('alert')).toHaveTextContent('El bloque ("Química") debe terminar después de empezar: va de 10:00 a 09:00.');
+
+    await llenar(usuario, 'Química', 'Miércoles', '09:00', '11:00');
+    expect(within(horario).getByRole('alert')).toHaveTextContent(
+      'El bloque ("Química") se solapa con otro del miércoles: "Física", de 08:00 a 10:00.',
+    );
+    expect(guardado().horario).toEqual(antes);
+
+    // Al corregir un campo el mensaje se va; un bloque que solo se toca con otro sí se agrega.
+    fireEvent.change(within(horario).getByLabelText('Inicio'), { target: { value: '10:00' } });
+    expect(within(horario).queryByRole('alert')).not.toBeInTheDocument();
+    await usuario.click(within(horario).getByRole('button', { name: 'Agregar' }));
+    expect(filaDelHorario('Química, miércoles de 10:00 a 11:00')).toBeInTheDocument();
+  });
+
+  it('borrar un bloque se puede deshacer con "Bloque borrado"', async () => {
+    const { usuario, guardado } = montar(semana());
+    const horario = seccion('Horario');
+
+    await usuario.click(within(horario).getByRole('button', { name: 'Borrar Física, miércoles de 08:00 a 10:00' }));
+
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).not.toBeInTheDocument();
+    expect(guardado().horario.map((b) => b.id)).toEqual(['b-qui', 'b-cal']);
+    expect(clasesDeHoy()).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Bloque borrado');
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).toBeInTheDocument();
+    expect(clasesDeHoy()).toHaveLength(2);
+  });
+
+  it('quitar una materia borra sus bloques del horario y de Hoy, y deshacer los devuelve', async () => {
+    const { usuario, guardado } = montar(semana());
+
+    await usuario.click(within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Física' }));
+    await usuario.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Quitar materia' }));
+
+    expect(filaDelHorario(/^Física,/)).not.toBeInTheDocument();
+    expect(clasesDeHoy().map((li) => li.textContent)).toEqual([expect.stringContaining('Química')]);
+    expect(guardado().horario.map((b) => b.id)).toEqual(['b-qui', 'b-cal']);
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).toBeInTheDocument();
+    expect(clasesDeHoy()).toHaveLength(2);
+  });
+
+  it('cada clase del Horario se anuncia con su frase, con texto oculto dentro de la fila y lo visible con aria-hidden', () => {
+    montar(semana());
+    const fila = filaDelHorario('Física, miércoles de 08:00 a 10:00');
+    expect(fila?.tagName).toBe('LI');
+    expect(fila).not.toHaveAttribute('aria-label');
+
+    // La frase está en el contenido de la fila, oculta a la vista.
+    const frase = within(fila!).getByText('Física, miércoles de 08:00 a 10:00');
+    expect(frase).toHaveClass('sr-only');
+    // Lo que se ve (hora, punto y nombre) no se lee, para no repetir la frase.
+    expect(within(fila!).getByText('08:00–10:00')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(fila!).getByText('Física').closest('[aria-hidden="true"]')).not.toBeNull();
+    // Del contenido, el lector solo oye la frase; el botón se anuncia por su propio nombre.
+    expect(textoLeido(fila!)).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(within(fila!).getByRole('button')).toHaveAccessibleName('Borrar Física, miércoles de 08:00 a 10:00');
   });
 });
 

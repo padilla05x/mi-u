@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { storageFalso } from '../test/storage-falso.ts';
 import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION } from './almacen.ts';
-import { agregarMateria, borrarEntrega, marcarAvisadas } from './datos.ts';
+import { agregarMateria, borrarEntrega, marcarAvisadas, quitarMateria } from './datos.ts';
 import { crearStore } from './store.ts';
 
 describe('crearStore', () => {
@@ -105,7 +105,7 @@ describe('crearStore', () => {
     store.actualizar((datos) => agregarMateria(datos, 'Física'));
     const guardadoAntes = storage.valores.get(CLAVE);
     const antes = store.obtener().datos;
-    const nuevos = { materias: [], entregas: [], drive: [] };
+    const nuevos = { materias: [], entregas: [], drive: [], horario: [] };
 
     expect(store.importar(nuevos, 'Datos importados')).toBe(true);
     expect(storage.valores.get(CLAVE_COPIA_IMPORTACION)).toBe(guardadoAntes);
@@ -133,9 +133,30 @@ describe('crearStore', () => {
     const oyente = vi.fn();
     store.suscribir(oyente);
 
-    expect(store.importar({ materias: [], entregas: [], drive: [] }, 'Datos importados')).toBe(false);
+    expect(store.importar({ materias: [], entregas: [], drive: [], horario: [] }, 'Datos importados')).toBe(false);
     expect(store.obtener()).toBe(antes);
     expect(base.valores.get(CLAVE)).toBe(guardadoAntes);
     expect(oyente).not.toHaveBeenCalled();
+  });
+
+  it('deshacer quitar una materia restaura también sus bloques del horario', () => {
+    const horario = [{ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00' }];
+    const storage = storageFalso({
+      [CLAVE]: JSON.stringify({
+        materias: [{ id: 'm1', nombre: 'Física', color: 'orquidea', clase: '', moodle: '', classroom: '', ocultaEn: [] }],
+        entregas: [],
+        drive: [],
+        horario,
+      }),
+    });
+    const store = crearStore(abrirAlmacen(storage));
+
+    store.actualizar((datos) => quitarMateria(datos, 'm1'), 'Materia quitada');
+    expect(store.obtener().datos.horario).toEqual([]);
+    expect(JSON.parse(storage.valores.get(CLAVE)!).horario).toEqual([]);
+
+    store.deshacer();
+    expect(store.obtener().datos.horario).toEqual(horario);
+    expect(JSON.parse(storage.valores.get(CLAVE)!).horario).toEqual(horario);
   });
 });

@@ -26,6 +26,7 @@ const datos: Datos = {
     },
   ],
   drive: [{ id: 'd1', nombre: 'Carpeta', url: 'https://drive.google.com' }],
+  horario: [],
 };
 
 // 8:30 p. m. en Bogotá; en Tokio, donde corren las pruebas, ya es el 15.
@@ -39,7 +40,7 @@ const entrega = (cambio: Record<string, unknown>) => con({ entregas: [{ ...datos
 describe('exportar', () => {
   it('incluye la versión del formato y la fecha de exportación en hora de Bogotá', () => {
     const archivo = JSON.parse(exportar(datos, AHORA));
-    expect(Object.keys(archivo)).toEqual(['version', 'fechaExportacion', 'materias', 'entregas', 'drive']);
+    expect(Object.keys(archivo)).toEqual(['version', 'fechaExportacion', 'materias', 'entregas', 'drive', 'horario']);
     expect(archivo).toMatchObject({ version: 1, fechaExportacion: '2026-10-14T20:30:00-05:00' });
   });
 
@@ -169,5 +170,61 @@ describe('importar: secciones ocultas (ocultaEn)', () => {
       motivo: 'El campo "ocultaEn" de la materia 1 ("Física") tiene "inventada", que no es una sección (clase, moodle o classroom).',
     });
     expect('datos' in resultado).toBe(false);
+  });
+});
+
+describe('importar: horario', () => {
+  const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
+  const conHorario = (horario: unknown) => con({ horario });
+
+  it('un respaldo sin horario queda con horario: []', () => {
+    const sinHorario: Partial<Datos> = { ...datos };
+    delete sinHorario.horario;
+    expect(importar(JSON.stringify({ version: 1, ...sinHorario }))).toEqual({ ok: true, datos });
+  });
+
+  it('conserva el horario, también con bloques solapados', () => {
+    const horario = [bloque(), bloque({ id: 'b2', inicio: '09:30', fin: '11:00' })];
+    expect(importar(conHorario(horario))).toEqual({ ok: true, datos: { ...datos, horario } });
+  });
+
+  const noEsDia = 'El campo "dia" del bloque 1 ("Física") no es un día de 0 (lunes) a 6 (domingo).';
+  const noEsHora = (campo: string) => `El campo "${campo}" del bloque 1 ("Física") no es una hora HH:MM de 00:00 a 23:59, como 08:00.`;
+  it.each([
+    ['horario no es una lista', conHorario({}), 'El campo "horario" no es una lista.'],
+    ['bloque que no es un objeto', conHorario(['lunes']), 'El bloque 1 no tiene el formato esperado.'],
+    ['bloque sin materiaId', conHorario([bloque({ materiaId: undefined })]), 'El bloque 1 no tiene el campo "materiaId".'],
+    ['día 7', conHorario([bloque({ dia: 7 })]), noEsDia],
+    ['día -1', conHorario([bloque({ dia: -1 })]), noEsDia],
+    ['día con decimales', conHorario([bloque({ dia: 1.5 })]), noEsDia],
+    ['día como texto', conHorario([bloque({ dia: '1' })]), noEsDia],
+    ['hora sin cero inicial', conHorario([bloque({ inicio: '8:00' })]), noEsHora('inicio')],
+    ['hora 24:00', conHorario([bloque({ fin: '24:00' })]), noEsHora('fin')],
+    ['minutos fuera de rango', conHorario([bloque({ inicio: '10:60' })]), noEsHora('inicio')],
+    ['hora con segundos', conHorario([bloque({ fin: '10:00:00' })]), noEsHora('fin')],
+    [
+      'termina antes de empezar',
+      conHorario([bloque({ inicio: '10:00', fin: '08:00' })]),
+      'El bloque 1 ("Física") debe terminar después de empezar: va de 10:00 a 08:00.',
+    ],
+    [
+      'termina a la misma hora en que empieza',
+      conHorario([bloque({ inicio: '10:00', fin: '10:00' })]),
+      'El bloque 1 ("Física") debe terminar después de empezar: va de 10:00 a 10:00.',
+    ],
+    [
+      'materia que no está en el archivo',
+      conHorario([bloque(), bloque({ id: 'b2', materiaId: 'm9' })]),
+      'El bloque 2 es de una materia que no está en el archivo ("m9").',
+    ],
+  ])('%s', (_caso, texto, motivo) => {
+    expect(importar(texto)).toEqual({ ok: false, motivo });
+  });
+
+  it('los motivos de un campo de algo masculino dicen "del", no "de el"', () => {
+    expect(importar(con({ drive: [{ id: 'd1', nombre: 'Carpeta', url: 5 }] }))).toEqual({
+      ok: false,
+      motivo: 'El campo "url" del enlace de Drive 1 ("Carpeta") no es texto.',
+    });
   });
 });

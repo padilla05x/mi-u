@@ -278,9 +278,11 @@ Son de Lucide (`lucide-react` 1.57) con trazo de 2 px:
 | Contadores | `CircleAlert`, `Clock` y `CalendarDays` |
 | Editar y Listo (modo edición) | `Pencil` y `Check` |
 | Mostrar una materia oculta y "todas ocultas" | `Eye` y `EyeOff` |
+| Hoy y Horario (título de la tarjeta) | `Sun` y `CalendarClock` |
+| En curso y Entrar | `Radio` y `LogIn` |
 | Aviso del almacén | `TriangleAlert` |
-| Estados vacíos | `ClipboardCheck` (Entregas), `BookPlus` (Mis materias y secciones de enlaces), `FolderPlus` (Drive) |
-| Botón "Ir a Mis materias" | `ArrowDown` (los demás botones de estado vacío usan `Plus`) |
+| Estados vacíos | `ClipboardCheck` (Entregas), `BookPlus` (Mis materias, secciones de enlaces y Horario sin materias), `FolderPlus` (Drive), `Coffee` (Hoy) y `CalendarPlus` (Horario) |
+| Botones "Ir a Mis materias" e "Ir a Horario" | `ArrowDown` (los demás botones de estado vacío usan `Plus`) |
 | Semana anterior, Esta semana y Semana siguiente | `ChevronLeft`, `CalendarCheck` y `ChevronRight` |
 | Buscar entregas (dentro del campo), sin resultados y filtro vacío | `Search`, `SearchX` (botón `X`) y `ListFilter` |
 
@@ -297,12 +299,15 @@ Son de Lucide (`lucide-react` 1.57) con trazo de 2 px:
 - **Controles nativos.** Todos son nativos: botones, campos, lista desplegable y casillas. Tab los recorre en el orden visual y Espacio o Enter los activan. No hay controles hechos a mano.
 - **Anillo de foco.** Es de 2 px en `foco`, separado 2 px del control (`outline` y `outline-offset`). Se ve en todos los controles cuando se navega con teclado (`:focus-visible`). En los campos, además, el borde pasa a `acento`.
 - **Orden del recorrido:**
-  1. Entregas: botón de avisos, formulario y lista (casilla y borrar).
-  2. Clases virtuales.
-  3. Aula virtual (Moodle).
-  4. Classroom.
-  5. Drive.
-  6. Mis materias.
+  1. Hoy: "Entrar" de cada clase.
+  2. Entregas: botón de avisos, formulario y lista (casilla y borrar).
+  3. Clases virtuales.
+  4. Aula virtual (Moodle).
+  5. Classroom.
+  6. Drive.
+  7. Mis materias.
+  8. Horario: formulario y lista (borrar).
+  9. Respaldo.
 - **Estados vacíos.** Su botón lleva el foco al campo donde se empieza (ver "Estados vacíos").
 
 ## Estructura de la pantalla
@@ -331,10 +336,10 @@ Detalles de los contadores:
 
 ### Tarjetas y su orden
 
-- **Orden.** El mismo de ahora: Entregas, Clases virtuales, Aula virtual (Moodle), Classroom, Drive y Mis materias.
+- **Orden.** Hoy, Entregas, Clases virtuales, Aula virtual (Moodle), Classroom, Drive, Mis materias, Horario y Respaldo.
 - **Cabecera.** Cada tarjeta lleva su icono de 20 px en `acento`, el título y debajo la pista en `tenue`.
-- **Escritorio (≥ 1024 px):** Entregas a todo el ancho; luego Clases virtuales, Moodle y Classroom en tres columnas; luego Drive y Mis materias en dos.
-- **Tablet (768–1023 px):** dos columnas, con Entregas a todo el ancho.
+- **Escritorio (≥ 1024 px):** Hoy y Entregas a todo el ancho; luego Clases virtuales, Moodle y Classroom en tres columnas; luego Drive y Mis materias en dos; al final Horario y Respaldo, a todo el ancho.
+- **Tablet (768–1023 px):** dos columnas, con Hoy, Entregas, Mis materias, Horario y Respaldo a todo el ancho.
 - **Móvil (< 768 px):** una columna.
 
 ### Filas
@@ -367,6 +372,9 @@ Van dentro de la tarjeta, en un recuadro con fondo `fondo` y radio de 12 px:
 | Mis materias sin materias | Todavía no tienes materias | Agrégalas para organizar tus entregas y enlaces. | "Agregar materia": lleva el foco a "Nueva materia" |
 | Clases virtuales, Moodle y Classroom sin materias | Primero agrega tus materias | Aquí aparecerá una fila por materia para guardar su enlace. | "Ir a Mis materias": lleva el foco a "Nueva materia" |
 | Drive sin enlaces | Guarda aquí tus carpetas | Los enlaces que más usas quedan a un clic. | "Agregar enlace": lleva el foco a "Nombre" |
+| Hoy sin clases hoy | Hoy no tienes clases | Aprovecha el día libre. Tu semana completa está en Horario. (Sin horario: "Agrega tu horario y aquí verás las clases de cada día, con su enlace para entrar.") | "Ir a Horario": lleva el foco a "Materia" del Horario. Sin materias, "Ir a Mis materias" lleva a "Nueva materia" |
+| Horario sin clases | Todavía no tienes horario | Agrega tus clases de la semana y verás las de cada día en Hoy. | "Agregar clase": lleva el foco a "Materia" |
+| Horario sin materias | Primero agrega tus materias | Cada clase del horario es de una de tus materias. | "Ir a Mis materias": lleva el foco a "Nueva materia" |
 
 ### Vista semanal
 
@@ -409,7 +417,7 @@ Se usa antes de quitar una materia, porque también borra sus enlaces y entregas
 
 ### Mensajes de error
 
-Si falta un dato en un formulario (Entregas, Drive) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien. En el respaldo dice el motivo concreto, por ejemplo: Falta el campo "materias".
+Si falta un dato en un formulario (Entregas, Drive, Horario) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien. En el respaldo dice el motivo concreto, por ejemplo: Falta el campo "materias".
 
 ### Modo edición
 
@@ -419,6 +427,24 @@ Clases virtuales, Aula virtual (Moodle) y Classroom tienen un botón secundario 
 - **Ocultas aquí (N).** Solo en modo edición y si hay alguna, al final de la tarjeta y separada por una línea en `borde`. Cada materia es un chip (fondo `fondo`, borde `borde`) con su punto, su nombre y un botón secundario "Mostrar" (`Eye`). Al mostrarla vuelve a su lugar con el campo vacío, y el foco pasa a ese campo.
 - **Todas ocultas.** En modo normal, un recuadro como el de los estados vacíos, con `EyeOff`, dice "Todas las materias están ocultas en esta sección. Usa Editar para mostrarlas de nuevo."
 - **Datos.** Cada materia guarda en `ocultaEn` las secciones de las que se quitó. Sigue en las demás, en Entregas y en Mis materias; quitarla desde Mis materias la sigue borrando por completo.
+
+### Hoy
+
+Tarjeta a todo el ancho, la primera debajo del encabezado (después del aviso del almacén, si lo hay).
+- **Qué muestra.** Las clases del día de hoy en Bogotá, en orden de hora, con la pista "Tus clases del miércoles, según tu horario.". Se actualiza con el reloj de la app, cada minuto.
+- **Fila.** Hora ("08:00–10:00", 14 px en peso 600 con cifras tabulares), punto y nombre de la materia y, a la derecha, "Entrar". En móvil la hora va encima del nombre. El lector de pantalla oye "De 08:00 a 10:00".
+- **En curso.** Desde el minuto de inicio hasta antes del de fin, una píldora "En curso" con `Radio`, en `acento` sobre `acento-suave`, con la misma forma que las etiquetas de estado. El texto dice el estado: no depende del color.
+- **Entrar.** Un enlace con aspecto de botón secundario e icono `LogIn`. Abre en otra pestaña el enlace de Clases virtuales (`target="_blank"` y `rel="noopener noreferrer"`), y su nombre es "Entrar a la clase de Física". Si la materia no tiene enlace, en su lugar va un botón deshabilitado "Sin enlace".
+- **Sin clases.** Estado vacío (ver "Estados vacíos").
+
+### Horario
+
+Tarjeta a todo el ancho, entre Mis materias y Respaldo.
+- **Formulario.** Materia, Día (de lunes a domingo), Inicio y Fin (campos de hora del navegador) y "Agregar". En escritorio va en una fila y en móvil, apilado. Al agregar se vacían las horas y se conservan la materia y el día.
+- **Reglas.** El fin va después del inicio, la materia está en Mis materias y la clase no se cruza con otra del mismo día. Dos clases que solo se tocan (08:00–10:00 y 10:00–12:00) sí se pueden. Si algo falla, el motivo sale como mensaje de error (ver "Mensajes de error").
+- **Lista.** Agrupada por día, de lunes a domingo, solo con los días que tienen clases (título de 13 px en peso 600) y cada día ordenado por hora. Los días van en tres columnas en escritorio y en dos en tablet. Cada clase es una fila con la hora, el punto y el nombre de la materia, y un botón de icono `Trash`.
+- **Nombres accesibles.** Cada clase se llama "Física, lunes de 08:00 a 10:00" y su botón, "Borrar Física, lunes de 08:00 a 10:00". Borrar se puede deshacer ("Bloque borrado").
+- **Datos.** `horario` guarda cada clase con el id de su materia (`materiaId`), el día (0 = lunes) y las horas `HH:MM` de Bogotá. Quitar una materia borra también sus clases.
 
 ## Pantallas de referencia
 

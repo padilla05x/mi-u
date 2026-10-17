@@ -6,6 +6,8 @@ import Classroom from './components/Classroom.tsx';
 import Drive from './components/Drive.tsx';
 import Encabezado from './components/Encabezado.tsx';
 import Entregas from './components/Entregas.tsx';
+import Horario from './components/Horario.tsx';
+import Hoy from './components/Hoy.tsx';
 import Materias from './components/Materias.tsx';
 import Respaldo from './components/Respaldo.tsx';
 import { botonIcono, botonSecundario } from './components/estilos.ts';
@@ -26,6 +28,7 @@ import {
   quitarMateria,
 } from './lib/datos.ts';
 import { resumenEntregas } from './lib/entregas.ts';
+import { agregarBloque, borrarBloque } from './lib/horario.ts';
 import { mostrarEnSeccion, quitarDeSeccion } from './lib/secciones.ts';
 import type { Store } from './lib/store.ts';
 import type { SeccionEnlace } from './lib/tipos.ts';
@@ -50,7 +53,7 @@ export default function App({ store }: { store: Store }) {
   return (
     <>
       <Encabezado ahora={ahora} resumen={resumenEntregas(datos.entregas, ahora)} />
-      {/* Escritorio: Entregas a todo el ancho, luego tres tarjetas de enlaces y luego Drive y Mis materias. */}
+      {/* Escritorio: Hoy y Entregas a todo el ancho, luego tres tarjetas de enlaces, Drive y Mis materias, y Horario. */}
       <main className="mx-auto grid max-w-[1120px] gap-4 px-4 pb-10 md:grid-cols-2 md:gap-5 md:px-6 lg:grid-cols-6">
         {avisos.map((aviso) => (
           <div
@@ -62,6 +65,7 @@ export default function App({ store }: { store: Store }) {
             <p>{aviso}</p>
           </div>
         ))}
+        <Hoy className="md:col-span-2 lg:col-span-6" horario={datos.horario} materias={datos.materias} ahora={ahora} />
         <Entregas
           className="md:col-span-2 lg:col-span-6"
           entregas={datos.entregas}
@@ -88,6 +92,13 @@ export default function App({ store }: { store: Store }) {
           onAgregar={(nombre) => store.actualizar((d) => agregarMateria(d, nombre))}
           onQuitar={(id) => store.actualizar((d) => quitarMateria(d, id), 'Materia quitada')}
           onMover={(id, destino) => store.actualizar((d) => moverMateria(d, id, destino))}
+        />
+        <Horario
+          className="md:col-span-2 lg:col-span-6"
+          horario={datos.horario}
+          materias={datos.materias}
+          onAgregar={(bloque) => store.actualizar((d) => agregarBloque(d, bloque))}
+          onBorrar={(id) => store.actualizar((d) => borrarBloque(d, id), 'Bloque borrado')}
         />
         <Respaldo
           className="md:col-span-2 lg:col-span-6"

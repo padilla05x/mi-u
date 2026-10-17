@@ -8,6 +8,8 @@ const botonBase =
 export const botonPrincipal = `${botonBase} bg-acento text-sobre-acento enabled:hover:bg-acento-hover`;
 /** Abrir enlaces, accesos a Google, activar avisos y botones de los estados vacíos. */
 export const botonSecundario = `${botonBase} bg-acento-suave text-acento enabled:hover:shadow-[inset_0_0_0_1px_var(--color-acento)]`;
+/** Como botonSecundario, pero para un enlace (<a>): :enabled no se aplica a los enlaces. */
+export const enlaceSecundario = `${botonBase} bg-acento-suave text-acento hover:shadow-[inset_0_0_0_1px_var(--color-acento)]`;
 /** Confirma una acción que borra, como "Quitar materia" en el diálogo de confirmación. */
 export const botonPeligro = `${botonBase} bg-peligro-suave text-peligro enabled:hover:shadow-[inset_0_0_0_1px_var(--color-peligro)]`;
 const baseIcono = `inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] text-tenue ${transicion}`;

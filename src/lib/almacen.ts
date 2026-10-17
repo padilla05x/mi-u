@@ -1,7 +1,7 @@
 import { esColorMateria, siguienteColor, type ColorMateria } from './colores.ts';
 import { nuevoId } from './datos.ts';
 import { aIsoBogota, esIsoBogota } from './fechas.ts';
-import type { Datos, DriveLink, Entrega, Materia, SeccionEnlace } from './tipos.ts';
+import type { Bloque, Datos, DiaSemana, DriveLink, Entrega, Materia, SeccionEnlace } from './tipos.ts';
 
 export const CLAVE = 'mi-u-v1';
 export const CLAVE_CORRUPTO = 'mi-u-v1-corrupto';
@@ -107,6 +107,7 @@ function estadoInicial(): Datos {
     materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '', ocultaEn: [] }))),
     entregas: [],
     drive: [],
+    horario: [],
   };
 }
 
@@ -144,29 +145,49 @@ export type Validacion = { ok: true; datos: Datos } | { ok: false; motivo: strin
 
 interface OpcionesValidacion {
   /**
-   * Qué hacer con un color de materia que no existe. Al cargar de localStorage se reemplaza por uno libre (false);
-   * al importar un respaldo, el archivo se rechaza (true). Si falta el color, siempre se asigna uno.
+   * false al cargar de localStorage: un color de materia que no existe se reemplaza por uno libre, y un bloque del
+   * horario de una materia que ya no existe se descarta. true al importar un respaldo: en los dos casos el archivo se
+   * rechaza con su motivo. Si falta el color, siempre se asigna uno.
    */
-  coloresEstrictos?: boolean;
+  estricto?: boolean;
 }
 
 /**
  * Reglas de los datos de Mi U, para la carga de localStorage y para importar respaldos. Migra el formato viejo
- * (fechas en milisegundos, materias sin color y sin ocultaEn) y conserva los campos que no conoce.
+ * (fechas en milisegundos, materias sin color y sin ocultaEn, datos sin horario) y conserva los campos que no conoce.
+ * Los bloques solapados se aceptan: solo los impide el formulario del horario.
  */
-export function validarDatos(valor: unknown, { coloresEstrictos = false }: OpcionesValidacion = {}): Validacion {
+export function validarDatos(valor: unknown, { estricto = false }: OpcionesValidacion = {}): Validacion {
   if (!esObjeto(valor)) return { ok: false, motivo: 'El archivo no contiene datos de Mi U.' };
   const entregas = Array.isArray(valor.entregas) ? valor.entregas.map(migrarEntrega) : valor.entregas;
+  // Los datos de antes del horario no lo traen.
+  const horario = valor.horario === undefined ? [] : valor.horario;
   const motivo =
-    motivoLista(valor.materias, 'materias', (materia, n) => motivoMateria(materia, n, coloresEstrictos)) ??
+    motivoLista(valor.materias, 'materias', (materia, n) => motivoMateria(materia, n, estricto)) ??
     motivoLista(entregas, 'entregas', motivoEntrega) ??
-    motivoLista(valor.drive, 'drive', motivoDriveLink);
+    motivoLista(valor.drive, 'drive', motivoDriveLink) ??
+    motivoLista(horario, 'horario', (bloque, n) =>
+      motivoBloque(bloque, {
+        quien: `el bloque ${n}`,
+        materias: valor.materias as MateriaGuardada[],
+        dondeMateria: estricto ? 'el archivo' : null,
+        conId: true,
+      }),
+    );
   if (motivo) return { ok: false, motivo };
-  // Las tres listas ya pasaron sus reglas.
+  // Las cuatro listas ya pasaron sus reglas.
   const materias = (valor.materias as MateriaGuardada[]).map(migrarMateria);
+  const ids = new Set(materias.map((m) => m.id));
   return {
     ok: true,
-    datos: { ...valor, materias: asignarColores(materias), entregas: entregas as Entrega[], drive: valor.drive as DriveLink[] },
+    datos: {
+      ...valor,
+      materias: asignarColores(materias),
+      entregas: entregas as Entrega[],
+      drive: valor.drive as DriveLink[],
+      // Al cargar se descartan los bloques de materias que ya no existen; al importar ya se rechazaron arriba.
+      horario: (horario as Bloque[]).filter((b) => ids.has(b.materiaId)),
+    },
   };
 }
 
@@ -221,6 +242,8 @@ function cual(tipo: string, n: number, valor: unknown, campoNombre: string): str
 }
 
 const conMayuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
+/** "de la materia 1", pero "del bloque 1". */
+const de = (quien: string) => (quien.startsWith('el ') ? `del ${quien.slice(3)}` : `de ${quien}`);
 
 /** Revisa los campos en orden y devuelve el motivo del primero que falta o no cumple. */
 function motivoCampos(
@@ -232,7 +255,7 @@ function motivoCampos(
   for (const [campos, cumple, falla] of reglas) {
     for (const campo of campos) {
       if (valor[campo] === undefined) return `${conMayuscula(quien)} no tiene el campo "${campo}".`;
-      if (!cumple(valor[campo])) return `El campo "${campo}" de ${quien} ${typeof falla === 'string' ? falla : falla(valor[campo])}.`;
+      if (!cumple(valor[campo])) return `El campo "${campo}" ${de(quien)} ${typeof falla === 'string' ? falla : falla(valor[campo])}.`;
     }
   }
   return null;
@@ -260,13 +283,13 @@ const esBooleano = (valor: unknown) => typeof valor === 'boolean';
  */
 type MateriaGuardada = Omit<Materia, 'color' | 'ocultaEn'> & { color?: unknown; ocultaEn?: SeccionEnlace[] };
 
-function motivoMateria(valor: unknown, n: number, coloresEstrictos: boolean): Motivo {
+function motivoMateria(valor: unknown, n: number, estricto: boolean): Motivo {
   const quien = cual('la materia', n, valor, 'nombre');
   const tiene = (campo: string) => esObjeto(valor) && valor[campo] !== undefined;
   return (
     motivoCampos(valor, quien, [[['id', 'nombre', 'clase', 'moodle', 'classroom'], esTexto, 'no es texto']]) ??
     (tiene('ocultaEn') ? motivoCampos(valor, quien, [[['ocultaEn'], esListaDeSecciones, motivoSecciones]]) : null) ??
-    (coloresEstrictos && tiene('color')
+    (estricto && tiene('color')
       ? motivoCampos(valor, quien, [[['color'], esColorMateria, (color) => `es ${JSON.stringify(color)}, que no es un color de Mi U`]])
       : null)
   );
@@ -282,4 +305,39 @@ function motivoEntrega(valor: unknown, n: number): Motivo {
 
 function motivoDriveLink(valor: unknown, n: number): Motivo {
   return motivoCampos(valor, cual('el enlace de Drive', n, valor, 'nombre'), [[['id', 'nombre', 'url'], esTexto, 'no es texto']]);
+}
+
+/** "HH:MM" de 24 horas, de 00:00 a 23:59. */
+const esHora = (valor: unknown) => typeof valor === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
+const esDiaSemana = (valor: unknown): valor is DiaSemana => Number.isInteger(valor) && (valor as number) >= 0 && (valor as number) <= 6;
+
+export interface ReglasBloque {
+  /** Cómo se nombra en el motivo: "el bloque 2" en una lista, "el bloque" en el formulario. */
+  quien: string;
+  materias: readonly { id: string; nombre: string }[];
+  /** Dónde debe estar su materia ("el archivo"), para el motivo si no existe; null si no se exige. */
+  dondeMateria: string | null;
+  /** Exigir el id: los bloques guardados lo tienen; uno nuevo del formulario todavía no. */
+  conId: boolean;
+}
+
+/**
+ * Reglas de un bloque del horario, compartidas por validarDatos y por el formulario (validarBloque en horario.ts):
+ * materia de texto, día de 0 a 6, horas HH:MM, fin después de inicio y, si se pide, una materia que exista.
+ * Devuelve el motivo del primer problema, o null. Los solapes no son de un bloque solo: los revisa validarBloque.
+ */
+export function motivoBloque(valor: unknown, { quien: base, materias, dondeMateria, conId }: ReglasBloque): string | null {
+  const materia = esObjeto(valor) ? materias.find((m) => m.id === valor.materiaId) : undefined;
+  const quien = `${base}${materia ? ` ("${materia.nombre}")` : ''}`;
+  const motivo = motivoCampos(valor, quien, [
+    [conId ? ['id', 'materiaId'] : ['materiaId'], esTexto, 'no es texto'],
+    [['dia'], esDiaSemana, 'no es un día de 0 (lunes) a 6 (domingo)'],
+    [['inicio', 'fin'], esHora, 'no es una hora HH:MM de 00:00 a 23:59, como 08:00'],
+  ]);
+  if (motivo) return motivo;
+  const { inicio, fin, materiaId } = valor as Bloque;
+  // Con el formato HH:MM, comparar el texto compara las horas.
+  if (fin <= inicio) return `${conMayuscula(quien)} debe terminar después de empezar: va de ${inicio} a ${fin}.`;
+  if (dondeMateria !== null && !materia) return `${conMayuscula(quien)} es de una materia que no está en ${dondeMateria} ("${materiaId}").`;
+  return null;
 }
