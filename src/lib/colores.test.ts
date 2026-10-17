@@ -20,6 +20,7 @@ describe('agregarMateria', () => {
       materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea' as const, clase: '', moodle: '', classroom: '', ocultaEn: [] }],
       entregas: [],
       drive: [],
+      horario: [],
     };
     expect(agregarMateria(datos, 'Cálculo Integral').materias[1]).toMatchObject({ nombre: 'Cálculo Integral', color: 'oliva' });
   });

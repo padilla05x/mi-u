@@ -15,12 +15,13 @@ export function agregarMateria(datos: Datos, nombre: string): Datos {
   return { ...datos, materias: [...datos.materias, { id: nuevoId(), nombre, color, clase: '', moodle: '', classroom: '', ocultaEn: [] }] };
 }
 
-/** Quita la materia (con sus enlaces) y también sus entregas. */
+/** Quita la materia (con sus enlaces) y también sus entregas y sus bloques del horario. */
 export function quitarMateria(datos: Datos, id: string): Datos {
   return {
     ...datos,
     materias: datos.materias.filter((m) => m.id !== id),
     entregas: datos.entregas.filter((e) => e.materia !== id),
+    horario: datos.horario.filter((b) => b.materiaId !== id),
   };
 }
 

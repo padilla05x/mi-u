@@ -18,7 +18,11 @@ const datosNuevos: Datos = {
   materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea', clase: 'https://meet.google.com/abc', moodle: '', classroom: '', ocultaEn: [] }],
   entregas: [{ id: 'e1', materia: 'm1', texto: 'Taller 3', fecha: '2026-10-20T20:00:00-05:00', hecha: false, avisada: false }],
   drive: [{ id: 'd1', nombre: 'Carpeta de PETI', url: 'https://drive.google.com/drive/folders/abc' }],
+  horario: [],
 };
+
+/** Un bloque válido de la materia de datosNuevos, con un cambio. */
+const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
 
 const lanza = (nombre: string) => (): never => {
   throw new DOMException('Simulado en la prueba', nombre);
@@ -82,6 +86,10 @@ describe('abrirAlmacen', () => {
     ['"hecha" no es booleano', JSON.stringify({ ...datosNuevos, entregas: [{ ...datosNuevos.entregas[0], hecha: 'no' }] })],
     ['ocultaEn nombra una sección que no existe', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], ocultaEn: ['drive'] }] })],
     ['ocultaEn no es una lista', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], ocultaEn: 'moodle' }] })],
+    ['horario no es una lista', JSON.stringify({ ...datosNuevos, horario: {} })],
+    ['bloque con un día fuera de 0..6', JSON.stringify({ ...datosNuevos, horario: [bloque({ dia: 7 })] })],
+    ['bloque con una hora mal formada', JSON.stringify({ ...datosNuevos, horario: [bloque({ inicio: '8:00' })] })],
+    ['bloque que termina antes de empezar', JSON.stringify({ ...datosNuevos, horario: [bloque({ inicio: '10:00', fin: '08:00' })] })],
   ])('forma incorrecta (%s): copia, estado inicial y aviso', (_caso, crudo) => {
     const storage = storageFalso({ [CLAVE]: crudo });
     const { datos, aviso } = abrirAlmacen(storage);
@@ -216,6 +224,40 @@ describe('secciones ocultas al cargar', () => {
     const nuevos: Datos = { ...datosNuevos, materias: [{ ...datosNuevos.materias[0], clase: '', ocultaEn: ['clase', 'classroom'] }] };
     const storage = storageFalso({ [CLAVE]: JSON.stringify(nuevos) });
     expect(abrirAlmacen(storage)).toMatchObject({ datos: nuevos, aviso: null });
+  });
+});
+
+describe('horario al cargar', () => {
+  const conHorario = (horario: unknown) => storageFalso({ [CLAVE]: JSON.stringify({ ...datosNuevos, horario }) });
+
+  it('los datos sin horario reciben [] y el formato nuevo se guarda al primer cambio', () => {
+    const viejos: Partial<Datos> = { ...datosNuevos };
+    delete viejos.horario;
+    const crudo = JSON.stringify(viejos);
+    const storage = storageFalso({ [CLAVE]: crudo });
+    const almacen = abrirAlmacen(storage);
+
+    expect(almacen.aviso).toBeNull();
+    expect(almacen.datos).toEqual(datosNuevos);
+    expect(storage.valores.get(CLAVE)).toBe(crudo); // Cargar no escribe nada.
+
+    almacen.guardar(almacen.datos);
+    expect(JSON.parse(storage.valores.get(CLAVE)!).horario).toEqual([]);
+  });
+
+  it('conserva los bloques válidos, también si se solapan', () => {
+    const horario = [bloque(), bloque({ id: 'b2', inicio: '09:00', fin: '11:00' }), bloque({ id: 'b3', dia: 6, inicio: '00:00', fin: '23:59' })];
+    expect(abrirAlmacen(conHorario(horario))).toMatchObject({ datos: { horario }, aviso: null });
+  });
+
+  it('descarta los bloques de una materia que ya no existe, sin rechazar los datos', () => {
+    const storage = conHorario([bloque(), bloque({ id: 'b2', materiaId: 'borrada' })]);
+    const { datos, aviso } = abrirAlmacen(storage);
+
+    expect(aviso).toBeNull();
+    expect(datos.horario.map((b) => b.id)).toEqual(['b1']);
+    expect(nombres(datos)).toEqual(['Ingeniería de Software']);
+    expect(storage.valores.has(CLAVE_CORRUPTO)).toBe(false);
   });
 });
 

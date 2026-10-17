@@ -18,6 +18,7 @@ const datos: Datos = {
   materias: [materia('a'), materia('b', { moodle: '', ocultaEn: ['moodle'] }), materia('c')],
   entregas: [{ id: 'e1', materia: 'a', texto: 'Taller', fecha: '2026-10-20T20:00:00-05:00', hecha: false, avisada: false }],
   drive: [],
+  horario: [],
 };
 const ids = (materias: Materia[]) => materias.map((m) => m.id);
 

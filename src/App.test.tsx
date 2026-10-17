@@ -37,8 +37,11 @@ const entrega = (id: string, materiaId: string, texto: string, fecha: string): E
   avisada: false,
 });
 
-function montar(datos?: Datos, storage: AlmacenWeb = storageFalso()) {
-  if (datos) storage.setItem(CLAVE, JSON.stringify(datos));
+/** Datos guardados para una prueba; sin horario, va vacío. */
+type DatosDePrueba = Omit<Datos, 'horario'> & Partial<Pick<Datos, 'horario'>>;
+
+function montar(datos?: DatosDePrueba, storage: AlmacenWeb = storageFalso()) {
+  if (datos) storage.setItem(CLAVE, JSON.stringify({ horario: [], ...datos }));
   const usuario = userEvent.setup();
   const vista = render(<App store={crearStore(abrirAlmacen(storage))} />);
   return { usuario, vista, guardado: (): Datos => JSON.parse(storage.getItem(CLAVE)!) };
@@ -675,7 +678,7 @@ describe('Estados vacíos', () => {
 });
 
 // Una entrega por estado el miércoles 14 de octubre a las 9:00: vencida, para hoy, mañana, en N días y entregada.
-const cincoEstados = (): Datos => ({
+const cincoEstados = (): DatosDePrueba => ({
   materias: [materia('m1', 'Ingeniería de Software'), materia('m2', 'Programación Concurrente')],
   entregas: [
     entrega('e1', 'm1', 'Parcial 1', '2026-10-13T18:00:00-05:00'),

@@ -35,5 +35,5 @@ export function importar(texto: string): Validacion {
     return { ok: false, motivo: 'El campo "version" no es un número de versión válido.' };
   }
   if (version > VERSION_RESPALDO) return { ok: false, motivo: VERSION_MAS_NUEVA };
-  return validarDatos(datos, { coloresEstrictos: true });
+  return validarDatos(datos, { estricto: true });
 }

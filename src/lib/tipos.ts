@@ -37,8 +37,23 @@ export interface DriveLink {
   url: string;
 }
 
+/** Día de la semana del horario: 0 = lunes … 6 = domingo. */
+export type DiaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Una clase del horario semanal, en hora de Bogotá. */
+export interface Bloque {
+  id: string;
+  /** id de la materia. */
+  materiaId: string;
+  dia: DiaSemana;
+  /** "HH:MM" de 24 horas; termina después de empezar, el mismo día. */
+  inicio: string;
+  fin: string;
+}
+
 export interface Datos {
   materias: Materia[];
   entregas: Entrega[];
   drive: DriveLink[];
+  horario: Bloque[];
 }
