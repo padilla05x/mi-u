@@ -4,7 +4,7 @@ const transicion = 'transition-colors duration-150 ease-estandar';
 const botonBase =
   'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] px-4 text-[14px] leading-5 font-semibold whitespace-nowrap transition duration-150 ease-estandar disabled:cursor-not-allowed disabled:opacity-50';
 
-/** Solo para crear: Agregar y Guardar. */
+/** Para crear (Agregar y Guardar) y para confirmar Importar en su diálogo. */
 export const botonPrincipal = `${botonBase} bg-acento text-sobre-acento enabled:hover:bg-acento-hover`;
 /** Abrir enlaces, accesos a Google, activar avisos y botones de los estados vacíos. */
 export const botonSecundario = `${botonBase} bg-acento-suave text-acento enabled:hover:shadow-[inset_0_0_0_1px_var(--color-acento)]`;

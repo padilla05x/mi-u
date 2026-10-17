@@ -86,7 +86,7 @@ export default function App({ store }: { store: Store }) {
         <Respaldo
           className="md:col-span-2 lg:col-span-6"
           datos={datos}
-          onImportar={(nuevos) => store.actualizar(() => nuevos, 'Datos importados')}
+          onImportar={(nuevos) => store.importar(nuevos, 'Datos importados')}
         />
       </main>
       {deshacer && (

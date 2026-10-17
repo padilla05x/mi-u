@@ -24,6 +24,11 @@ export interface Store {
    * a los datos que restauraría Deshacer, para que deshacer un borrado no pierda este cambio.
    */
   actualizarSinDeshacer(cambio: (datos: Datos) => Datos): void;
+  /**
+   * Reemplaza todos los datos por los de un respaldo, como un cambio deshacible con el mensaje `deshacible`. Antes
+   * copia lo guardado (ver Almacen.copiarAntesDeImportar); si no puede, no cambia nada y devuelve false.
+   */
+  importar(datos: Datos, deshacible: string): boolean;
   /** Devuelve los datos a antes del último cambio deshacible. */
   deshacer(): void;
   /** Quita la opción de deshacer sin revertir nada. */
@@ -48,15 +53,21 @@ export function crearStore(almacen: Almacen): Store {
     };
     oyentes.forEach((oyente) => oyente());
   };
+  const actualizar: Store['actualizar'] = (cambio, deshacible) => {
+    previo = deshacible ? estado.datos : null;
+    aplicar(cambio(estado.datos), deshacible ?? null);
+  };
   return {
     obtener: () => estado,
     suscribir(oyente) {
       oyentes.add(oyente);
       return () => oyentes.delete(oyente);
     },
-    actualizar(cambio, deshacible) {
-      previo = deshacible ? estado.datos : null;
-      aplicar(cambio(estado.datos), deshacible ?? null);
+    actualizar,
+    importar(datos, deshacible) {
+      if (!almacen.copiarAntesDeImportar()) return false;
+      actualizar(() => datos, deshacible);
+      return true;
     },
     actualizarSinDeshacer(cambio) {
       if (previo) previo = cambio(previo);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { storageFalso } from '../test/storage-falso.ts';
-import { abrirAlmacen, CLAVE } from './almacen.ts';
+import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION } from './almacen.ts';
 import { agregarMateria, borrarEntrega, marcarAvisadas } from './datos.ts';
 import { crearStore } from './store.ts';
 
@@ -97,5 +97,45 @@ describe('crearStore', () => {
     expect(store.obtener().deshacer).toBeNull();
     store.deshacer();
     expect(store.obtener().datos.materias.at(-1)?.nombre).toBe('Física');
+  });
+
+  it('importar copia lo guardado, reemplaza los datos y se puede deshacer', () => {
+    const storage = storageFalso();
+    const store = crearStore(abrirAlmacen(storage));
+    store.actualizar((datos) => agregarMateria(datos, 'Física'));
+    const guardadoAntes = storage.valores.get(CLAVE);
+    const antes = store.obtener().datos;
+    const nuevos = { materias: [], entregas: [], drive: [] };
+
+    expect(store.importar(nuevos, 'Datos importados')).toBe(true);
+    expect(storage.valores.get(CLAVE_COPIA_IMPORTACION)).toBe(guardadoAntes);
+    expect(store.obtener()).toMatchObject({ datos: nuevos, deshacer: 'Datos importados' });
+    expect(JSON.parse(storage.valores.get(CLAVE)!)).toEqual(nuevos);
+
+    store.deshacer();
+    expect(store.obtener().datos).toBe(antes);
+  });
+
+  it('si la copia falla, importar no cambia nada', () => {
+    const base = storageFalso();
+    const store = crearStore(
+      abrirAlmacen({
+        ...base,
+        setItem: (clave: string, valor: string) => {
+          if (clave === CLAVE_COPIA_IMPORTACION) throw new DOMException('Simulado en la prueba', 'QuotaExceededError');
+          base.setItem(clave, valor);
+        },
+      }),
+    );
+    store.actualizar((datos) => agregarMateria(datos, 'Física'), 'Algo deshacible');
+    const antes = store.obtener();
+    const guardadoAntes = base.valores.get(CLAVE);
+    const oyente = vi.fn();
+    store.suscribir(oyente);
+
+    expect(store.importar({ materias: [], entregas: [], drive: [] }, 'Datos importados')).toBe(false);
+    expect(store.obtener()).toBe(antes);
+    expect(base.valores.get(CLAVE)).toBe(guardadoAntes);
+    expect(oyente).not.toHaveBeenCalled();
   });
 });

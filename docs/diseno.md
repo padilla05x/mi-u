@@ -15,7 +15,7 @@ Sigo la dirección pedida, con estas precisiones:
 
 - **Inter autoalojada.** Se instala con el paquete `@fontsource-variable/inter` (licencia OFL 1.1) y Vite la empaqueta con la app. Google Fonts rompería la promesa de privacidad del README.
 - **Controles nativos con estilo.** La lista de materias, la casilla y el campo de fecha y hora siguen siendo los del navegador, con estilo propio. Funcionan con teclado y lector de pantalla sin código extra. Con `color-scheme: light dark`, el navegador también los dibuja en oscuro.
-- **Jerarquía de botones.** El botón principal (relleno de acento) queda solo para crear: Agregar y Guardar. "Abrir", "Abrir Google Classroom", "Abrir Google Drive" y "Activar avisos del navegador" pasan a ser botones secundarios, para que las filas de enlaces no compitan con los formularios.
+- **Jerarquía de botones.** El botón principal (relleno de acento) queda para crear (Agregar y Guardar) y para confirmar "Importar" en su diálogo. "Abrir", "Abrir Google Classroom", "Abrir Google Drive" y "Activar avisos del navegador" pasan a ser botones secundarios, para que las filas de enlaces no compitan con los formularios.
 - **Colores de materia propios.** Quedan fuera de los tonos de los estados y están comprobados para daltonismo (ver "Colores de materia"); no están elegidos a ojo.
 - **Modo oscuro automático, como ahora.** Sigue la preferencia del sistema. Un selector manual sería una función nueva.
 
@@ -399,14 +399,14 @@ Conserva `role="alert"`, como ahora.
 
 ### Diálogo de confirmación
 
-Se usa antes de quitar una materia, porque también borra sus enlaces y entregas.
+Se usa antes de quitar una materia, porque también borra sus enlaces y entregas, y antes de importar un respaldo, porque reemplaza todos los datos.
 - **Aspecto.** Panel con el estilo de una tarjeta (fondo `tarjeta`, borde `borde`, radio de 16 px y su sombra), centrado sobre la página cubierta con `fondo` al 80 %.
-- **Contenido.** Título de 18 px, explicación en `tenue` y dos botones: "Cancelar" (secundario) y la acción, como "Quitar materia", en botón de peligro (`peligro` sobre `peligro-suave`).
+- **Contenido.** Título de 18 px, explicación en `tenue` y dos botones: "Cancelar" (secundario) y la acción. "Quitar materia" va en botón de peligro (`peligro` sobre `peligro-suave`); "Importar" va en botón principal, porque antes se guarda una copia y se puede deshacer.
 - **Teclado.** El foco empieza en "Cancelar", Tab no sale del diálogo y Esc lo cierra. Al cerrar, el foco vuelve al botón que lo abrió; si ese botón ya no existe, pasa a "Deshacer".
 
 ### Mensajes de error
 
-Si falta un dato en un formulario (Entregas, Drive) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien.
+Si falta un dato en un formulario (Entregas, Drive) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien. En el respaldo dice el motivo concreto, por ejemplo: Falta el campo "materias".
 
 ## Pantallas de referencia
 
