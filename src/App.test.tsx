@@ -1006,6 +1006,19 @@ describe('Hoy y Horario', () => {
       bloqueDe('b-cal', 'cal', 0, '10:00', '12:00'),
     ]);
   const clasesDeHoy = () => within(screen.getByRole('list', { name: 'Clases de hoy' })).getAllByRole('listitem');
+  /** La fila del Horario que se anuncia con esa frase (su texto oculto), o null. */
+  const filaDelHorario = (frase: string | RegExp) => within(seccion('Horario')).queryByText(frase)?.closest('li') ?? null;
+  /** Lo que el lector de pantalla lee del contenido: sin lo que tiene aria-hidden ni los botones, que se anuncian por su nombre. */
+  const textoLeido = (elemento: Element): string =>
+    [...elemento.childNodes]
+      .map((nodo) =>
+        nodo.nodeType === Node.TEXT_NODE
+          ? nodo.textContent
+          : nodo instanceof Element && nodo.getAttribute('aria-hidden') !== 'true' && nodo.tagName !== 'BUTTON'
+            ? textoLeido(nodo)
+            : '',
+      )
+      .join('');
   const llenar = async (usuario: ReturnType<typeof userEvent.setup>, materiaNombre: string, dia: string, inicio: string, fin: string) => {
     const horario = seccion('Horario');
     await usuario.selectOptions(within(horario).getByLabelText('Materia'), materiaNombre);
@@ -1094,11 +1107,11 @@ describe('Hoy y Horario', () => {
     expect(otros).toEqual([]);
     expect(lunes).toBe(within(horario).getByRole('list', { name: 'Lunes' }));
     expect(miercoles).toBe(within(horario).getByRole('list', { name: 'Miércoles' }));
-    expect(within(within(horario).getByRole('list', { name: 'Miércoles' })).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual([
+    expect(within(within(horario).getByRole('list', { name: 'Miércoles' })).getAllByRole('listitem').map(textoLeido)).toEqual([
       'Física, miércoles de 06:00 a 07:00',
       'Física, miércoles de 08:00 a 10:00',
     ]);
-    expect(within(horario).getByRole('listitem', { name: 'Química, lunes de 10:00 a 12:00' })).toHaveTextContent('10:00–12:00');
+    expect(filaDelHorario('Química, lunes de 10:00 a 12:00')).toHaveTextContent('10:00–12:00');
     expect(guardado().horario).toEqual([
       { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '08:00', fin: '10:00' },
       { id: expect.any(String), materiaId: 'qui', dia: 0, inicio: '10:00', fin: '12:00' },
@@ -1132,7 +1145,7 @@ describe('Hoy y Horario', () => {
     fireEvent.change(within(horario).getByLabelText('Inicio'), { target: { value: '10:00' } });
     expect(within(horario).queryByRole('alert')).not.toBeInTheDocument();
     await usuario.click(within(horario).getByRole('button', { name: 'Agregar' }));
-    expect(within(horario).getByRole('listitem', { name: 'Química, miércoles de 10:00 a 11:00' })).toBeInTheDocument();
+    expect(filaDelHorario('Química, miércoles de 10:00 a 11:00')).toBeInTheDocument();
   });
 
   it('borrar un bloque se puede deshacer con "Bloque borrado"', async () => {
@@ -1141,13 +1154,13 @@ describe('Hoy y Horario', () => {
 
     await usuario.click(within(horario).getByRole('button', { name: 'Borrar Física, miércoles de 08:00 a 10:00' }));
 
-    expect(within(horario).queryByRole('listitem', { name: 'Física, miércoles de 08:00 a 10:00' })).not.toBeInTheDocument();
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).not.toBeInTheDocument();
     expect(guardado().horario.map((b) => b.id)).toEqual(['b-qui', 'b-cal']);
     expect(clasesDeHoy()).toHaveLength(1);
     expect(screen.getByRole('status')).toHaveTextContent('Bloque borrado');
 
     await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
-    expect(within(horario).getByRole('listitem', { name: 'Física, miércoles de 08:00 a 10:00' })).toBeInTheDocument();
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).toBeInTheDocument();
     expect(clasesDeHoy()).toHaveLength(2);
   });
 
@@ -1157,13 +1170,30 @@ describe('Hoy y Horario', () => {
     await usuario.click(within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Física' }));
     await usuario.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Quitar materia' }));
 
-    expect(within(seccion('Horario')).queryByRole('listitem', { name: /^Física,/ })).not.toBeInTheDocument();
+    expect(filaDelHorario(/^Física,/)).not.toBeInTheDocument();
     expect(clasesDeHoy().map((li) => li.textContent)).toEqual([expect.stringContaining('Química')]);
     expect(guardado().horario.map((b) => b.id)).toEqual(['b-qui', 'b-cal']);
 
     await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
-    expect(within(seccion('Horario')).getByRole('listitem', { name: 'Física, miércoles de 08:00 a 10:00' })).toBeInTheDocument();
+    expect(filaDelHorario('Física, miércoles de 08:00 a 10:00')).toBeInTheDocument();
     expect(clasesDeHoy()).toHaveLength(2);
+  });
+
+  it('cada clase del Horario se anuncia con su frase, con texto oculto dentro de la fila y lo visible con aria-hidden', () => {
+    montar(semana());
+    const fila = filaDelHorario('Física, miércoles de 08:00 a 10:00');
+    expect(fila?.tagName).toBe('LI');
+    expect(fila).not.toHaveAttribute('aria-label');
+
+    // La frase está en el contenido de la fila, oculta a la vista.
+    const frase = within(fila!).getByText('Física, miércoles de 08:00 a 10:00');
+    expect(frase).toHaveClass('sr-only');
+    // Lo que se ve (hora, punto y nombre) no se lee, para no repetir la frase.
+    expect(within(fila!).getByText('08:00–10:00')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(fila!).getByText('Física').closest('[aria-hidden="true"]')).not.toBeNull();
+    // Del contenido, el lector solo oye la frase; el botón se anuncia por su propio nombre.
+    expect(textoLeido(fila!)).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(within(fila!).getByRole('button')).toHaveAccessibleName('Borrar Física, miércoles de 08:00 a 10:00');
   });
 });
 

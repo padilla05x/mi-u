@@ -145,16 +145,13 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
                         const descripcion = describirBloque(bloque, nombre);
                         const color = porId.get(bloque.materiaId)?.color;
                         return (
-                          <li key={bloque.id} aria-label={descripcion} className={`${fila} flex items-center gap-3`}>
-                            <span className="shrink-0 text-[14px] leading-5 font-semibold tabular-nums">
-                              <span aria-hidden="true">
-                                {bloque.inicio}–{bloque.fin}
-                              </span>
-                              <span className="sr-only">
-                                De {bloque.inicio} a {bloque.fin}
-                              </span>
+                          <li key={bloque.id} className={`${fila} flex items-center gap-3`}>
+                            {/* El lector de pantalla oye la frase completa; lo que se ve va oculto para que no lo repita. */}
+                            <span className="sr-only">{descripcion}</span>
+                            <span aria-hidden="true" className="shrink-0 text-[14px] leading-5 font-semibold tabular-nums">
+                              {bloque.inicio}–{bloque.fin}
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-2">
+                            <span aria-hidden="true" className="flex min-w-0 flex-1 items-center gap-2">
                               {color && <PuntoMateria color={color} />}
                               <span className={`${tituloElemento} truncate`} title={nombre}>
                                 {nombre}
