@@ -31,6 +31,8 @@ Entregas, clases virtuales, Moodle, Classroom y Drive, sin cuentas ni servidores
 - **Resumen:** el encabezado saluda según la hora del día y cuenta las entregas vencidas, las de hoy y las de los próximos 7 días.
 - **Avisos:** notificación del navegador cuando faltan 24 horas o menos para una entrega (requiere permiso). Solo funciona con la página abierta: revisa al abrirla y cada minuto.
 - **Clases virtuales, Moodle y Classroom:** guarda por materia el enlace de Meet, Zoom o Teams, del aula de Moodle y de la clase de Google Classroom, y ábrelo con un clic. Si el enlace no empieza por `http://` o `https://`, la app le agrega `https://`. Con **Editar** puedes quitar de una de estas secciones las materias que no la usan: se borra su enlace ahí, pero la materia sigue en las demás, y puedes mostrarla de nuevo cuando quieras.
+- **Hoy:** tus clases del día en orden de hora, con "Entrar" para abrir su clase virtual en otra pestaña y la etiqueta "En curso" en la que está ocurriendo.
+- **Horario:** tus clases fijas de la semana, con materia, día, hora de inicio y de fin, agrupadas por día. No deja agregar dos clases que se crucen el mismo día, y borrar una se puede deshacer.
 - **Drive:** acceso directo a Google Drive y a las carpetas o enlaces que uses seguido.
 - **Materias:** agrega o quita materias; aparecen en todas las secciones, salvo donde las quites con Editar. Cada una recibe un color propio para reconocerla de un vistazo, y puedes reordenarlas arrastrándolas o con las flechas. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
 - **Tema:** claro, oscuro o el del sistema, con el selector del encabezado.
@@ -103,7 +105,7 @@ Ojo: el paso 2 reemplaza lo que ya tengas guardado en la versión nueva.
 
 - **Todo queda en tu navegador.** Los datos viven en el `localStorage`. No hay servidor ni cuentas, y nada se envía a servidores externos. Hasta la fuente (Inter) viene incluida en la app; solo se sale de ella cuando abres un enlace tuyo.
 - **Claves que usa:**
-  - `mi-u-v1`: materias, entregas y enlaces de Drive.
+  - `mi-u-v1`: materias, entregas, enlaces de Drive y horario.
   - `mi-u-tema`: el tema elegido, solo si no es "Sistema".
   - `mi-u-v1-corrupto`: copia que se crea si los datos guardados aparecen dañados (si ya existe, la siguiente es `mi-u-v1-corrupto-2` y así sucesivamente).
   - `mi-u-v1-respaldo-importacion`: copia de lo guardado justo antes de la última importación. Si no se puede crear, no se importa nada.
@@ -146,6 +148,7 @@ mi-u.html       versión anterior, en un solo archivo
 - [x] Pruebas unitarias para la lógica de fechas y estados
 - [x] Atajos de teclado
 - [x] Quitar materias de Clases virtuales, Moodle o Classroom sin borrarlas
+- [x] Horario semanal y clases de hoy
 - [ ] Elegir a mano el color de cada materia (hoy se asigna solo)
 
 ## Pendientes

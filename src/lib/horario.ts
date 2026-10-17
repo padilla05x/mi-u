@@ -3,7 +3,7 @@
 import { motivoBloque } from './almacen.ts';
 import { nombreMateria, nuevoId } from './datos.ts';
 import { diaDeSemanaEnBogota, horaEnBogota } from './fechas.ts';
-import type { Bloque, Datos, Materia } from './tipos.ts';
+import type { Bloque, Datos, DiaSemana, Materia } from './tipos.ts';
 
 /** Nombre de cada día del horario: el índice es Bloque.dia (0 = lunes). */
 export const DIAS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'] as const;
@@ -31,10 +31,25 @@ export function validarBloque(bloque: BloqueNuevo | Bloque, horario: Bloque[], m
   );
 }
 
+/** Por hora de inicio y, si empiezan a la vez, de fin. */
+const porHora = (a: Bloque, b: Bloque) => a.inicio.localeCompare(b.inicio) || a.fin.localeCompare(b.fin);
+
 /** Los bloques del día de hoy en Bogotá, ordenados por hora de inicio (y de fin, si empiezan a la vez). */
 export function clasesDeHoy(horario: Bloque[], ahora: number): Bloque[] {
   const hoy = diaDeSemanaEnBogota(ahora);
-  return horario.filter((b) => b.dia === hoy).sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fin.localeCompare(b.fin));
+  return horario.filter((b) => b.dia === hoy).sort(porHora);
+}
+
+/** Los días que tienen bloques, de lunes a domingo, cada uno con sus bloques ordenados por hora. */
+export function horarioPorDia(horario: Bloque[]): { dia: DiaSemana; bloques: Bloque[] }[] {
+  return DIAS.map((_, dia) => ({ dia: dia as DiaSemana, bloques: horario.filter((b) => b.dia === dia).sort(porHora) })).filter(
+    (grupo) => grupo.bloques.length > 0,
+  );
+}
+
+/** "Física, lunes de 08:00 a 10:00": el nombre accesible del bloque. */
+export function describirBloque(bloque: Bloque, nombreMateria: string): string {
+  return `${nombreMateria}, ${DIAS[bloque.dia]} de ${bloque.inicio} a ${bloque.fin}`;
 }
 
 /** true si el bloque es de hoy y la hora en Bogotá ya llegó a su inicio sin llegar a su fin: [inicio, fin). */

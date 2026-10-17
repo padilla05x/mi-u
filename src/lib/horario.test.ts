@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { agregarBloque, borrarBloque, clasesDeHoy, DIAS, enCurso, validarBloque, type BloqueNuevo } from './horario.ts';
+import {
+  agregarBloque,
+  borrarBloque,
+  clasesDeHoy,
+  describirBloque,
+  DIAS,
+  enCurso,
+  horarioPorDia,
+  validarBloque,
+  type BloqueNuevo,
+} from './horario.ts';
 import type { Bloque, Datos, Materia } from './tipos.ts';
 
 const materia = (id: string, nombre: string): Materia => ({
@@ -168,6 +178,27 @@ describe('agregarBloque y borrarBloque', () => {
   it('borra el bloque por id; si no existe, devuelve los mismos datos', () => {
     expect(borrarBloque(datos, 'b1').horario).toEqual([]);
     expect(borrarBloque(datos, 'x')).toBe(datos);
+  });
+});
+
+describe('horarioPorDia y describirBloque', () => {
+  it('agrupa solo los días con bloques, de lunes a domingo, y ordena cada día por hora', () => {
+    const horario = [
+      bloque('dom', { dia: 6 }),
+      bloque('mie-tarde', { dia: 2, inicio: '14:00', fin: '16:00' }),
+      bloque('lun', { dia: 0 }),
+      bloque('mie-temprano', { dia: 2, inicio: '07:00', fin: '08:00' }),
+    ];
+    expect(horarioPorDia(horario).map(({ dia, bloques }) => [dia, ids(bloques)])).toEqual([
+      [0, ['lun']],
+      [2, ['mie-temprano', 'mie-tarde']],
+      [6, ['dom']],
+    ]);
+    expect(horarioPorDia([])).toEqual([]);
+  });
+
+  it('describe el bloque con la materia, el día y las horas', () => {
+    expect(describirBloque(bloque('b', { dia: 2, inicio: '08:00', fin: '10:00' }), 'Física')).toBe('Física, miércoles de 08:00 a 10:00');
   });
 });
 
