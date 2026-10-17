@@ -36,6 +36,8 @@
   --color-dias-fondo: light-dark(#eef1f6, #212839);
   --color-aviso: light-dark(#924a00, #f6c77e);
   --color-aviso-fondo: light-dark(#fff1db, #33250f);
+  --color-peligro: light-dark(#b42318, #fda4a4);
+  --color-peligro-suave: light-dark(#fdecea, #36161a);
 
   --color-materia-orquidea: light-dark(#b661da, #be69e2);
   --color-materia-oliva: light-dark(#516000, #637500);

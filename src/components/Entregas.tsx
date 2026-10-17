@@ -1,5 +1,6 @@
 import { BellRing, ClipboardCheck, ClipboardList, ListFilter, Plus, SearchX, Trash, X } from 'lucide-react';
 import { useState } from 'react';
+import { useErrorFormulario } from '../hooks/useErrorFormulario.ts';
 import { estadoEntrega, ordenarEntregas } from '../lib/entregas.ts';
 import { desdeCampoFecha, formatoFechaEntrega } from '../lib/fechas.ts';
 import { contarPorFiltro, filtrarEntregas, type FiltroEntregas } from '../lib/filtros.ts';
@@ -9,6 +10,7 @@ import EstadoVacio from './EstadoVacio.tsx';
 import EtiquetaEstado from './EtiquetaEstado.tsx';
 import { botonIcono, botonPrincipal, botonSecundario, campo, fila, tituloElemento } from './estilos.ts';
 import FiltrosEntregas from './FiltrosEntregas.tsx';
+import MensajeError from './MensajeError.tsx';
 import PuntoMateria from './PuntoMateria.tsx';
 import Tarjeta from './Tarjeta.tsx';
 import VistaSemanal from './VistaSemanal.tsx';
@@ -38,6 +40,7 @@ export default function Entregas(props: Props) {
   const [materia, setMateria] = useState('');
   const [texto, setTexto] = useState('');
   const [fecha, setFecha] = useState('');
+  const { error, mostrar: mostrarError, limpiar: limpiarError } = useErrorFormulario();
   // Si la materia elegida ya no existe (o aún no se eligió), queda la primera, como en un <select> normal.
   const materiaElegida = materias.some((m) => m.id === materia) ? materia : (materias[0]?.id ?? '');
   const porId = new Map(materias.map((m) => [m.id, m]));
@@ -49,9 +52,10 @@ export default function Entregas(props: Props) {
     const descripcion = texto.trim();
     const fechaGuardada = desdeCampoFecha(fecha);
     if (!descripcion || !fechaGuardada || !materiaElegida) {
-      window.alert('Completa materia, descripción y fecha.');
+      mostrarError('Completa materia, descripción y fecha.');
       return;
     }
+    limpiarError();
     onAgregar({ materia: materiaElegida, texto: descripcion, fecha: fechaGuardada });
     setTexto('');
     setFecha('');
@@ -74,7 +78,15 @@ export default function Entregas(props: Props) {
       )}
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_auto] md:items-end">
         <Campo id="entrega-materia" etiqueta="Materia">
-          <select id="entrega-materia" className={campo} value={materiaElegida} onChange={(e) => setMateria(e.target.value)}>
+          <select
+            id="entrega-materia"
+            className={campo}
+            value={materiaElegida}
+            onChange={(e) => {
+              setMateria(e.target.value);
+              limpiarError();
+            }}
+          >
             {materias.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.nombre}
@@ -89,7 +101,10 @@ export default function Entregas(props: Props) {
             className={campo}
             placeholder="Ej. Taller 3"
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => {
+              setTexto(e.target.value);
+              limpiarError();
+            }}
           />
         </Campo>
         <Campo id="entrega-fecha" etiqueta="Fecha límite">
@@ -98,7 +113,10 @@ export default function Entregas(props: Props) {
             type="datetime-local"
             className={campo}
             value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
+            onChange={(e) => {
+              setFecha(e.target.value);
+              limpiarError();
+            }}
           />
         </Campo>
         <button type="button" className={botonPrincipal} onClick={agregar}>
@@ -106,6 +124,7 @@ export default function Entregas(props: Props) {
           Agregar
         </button>
       </div>
+      <MensajeError error={error} className="mt-3" />
       <div className="mt-4">
         <VistaSemanal entregas={entregas} materias={materias} ahora={ahora} />
       </div>

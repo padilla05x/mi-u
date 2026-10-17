@@ -14,5 +14,7 @@ export default defineConfig({
     // Fuera de America/Bogota, para que las pruebas de fechas no pasen
     // solo porque el equipo ya está en esa zona.
     env: { TZ: 'Asia/Tokyo' },
+    // Node 25 trae su propio localStorage y avisa si no tiene archivo; sin él, las pruebas usan el de jsdom.
+    execArgv: ['--no-experimental-webstorage'],
   },
 });

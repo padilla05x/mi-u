@@ -2,6 +2,7 @@ import { BookOpen, BookPlus, ChevronDown, ChevronUp, GripVertical, Plus, Trash }
 import { useState } from 'react';
 import type { Materia } from '../lib/tipos.ts';
 import Campo from './Campo.tsx';
+import Dialogo from './Dialogo.tsx';
 import EstadoVacio from './EstadoVacio.tsx';
 import { botonIcono, botonPrincipal, campo, fila, tituloElemento } from './estilos.ts';
 import PuntoMateria from './PuntoMateria.tsx';
@@ -20,6 +21,7 @@ interface Props {
 export default function Materias({ materias, onAgregar, onQuitar, onMover, className }: Props) {
   const [nombre, setNombre] = useState('');
   const [arrastrando, setArrastrando] = useState<string | null>(null);
+  const [porQuitar, setPorQuitar] = useState<Materia | null>(null);
 
   const agregar = () => {
     const nombreLimpio = nombre.trim();
@@ -29,7 +31,8 @@ export default function Materias({ materias, onAgregar, onQuitar, onMover, class
   };
 
   const quitar = (m: Materia) => {
-    if (window.confirm(`¿Quitar "${m.nombre}"? También se borran sus links y entregas.`)) onQuitar(m.id);
+    onQuitar(m.id);
+    setPorQuitar(null);
   };
 
   return (
@@ -84,7 +87,7 @@ export default function Materias({ materias, onAgregar, onQuitar, onMover, class
                 className={botonIcono}
                 title="Quitar"
                 aria-label={`Quitar ${m.nombre}`}
-                onClick={() => quitar(m)}
+                onClick={() => setPorQuitar(m)}
               >
                 <Trash size={18} aria-hidden="true" />
               </button>
@@ -108,6 +111,19 @@ export default function Materias({ materias, onAgregar, onQuitar, onMover, class
           Agregar
         </button>
       </div>
+      {porQuitar && (
+        <Dialogo
+          titulo={`¿Quitar "${porQuitar.nombre}"?`}
+          accion="Quitar materia"
+          iconoAccion={Trash}
+          onConfirmar={() => quitar(porQuitar)}
+          onCancelar={() => setPorQuitar(null)}
+          // Al quitarla desaparece su botón: el foco pasa a "Deshacer".
+          focoSinOrigen="boton-deshacer"
+        >
+          También se borran sus enlaces y entregas. Después podrás deshacerlo.
+        </Dialogo>
+      )}
     </Tarjeta>
   );
 }
