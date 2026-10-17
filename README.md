@@ -30,9 +30,9 @@ Entregas, clases virtuales, Moodle, Classroom y Drive, sin cuentas ni servidores
 - **Filtros y búsqueda:** muestra todas las entregas, las pendientes, las vencidas o las entregadas, con la cantidad de cada grupo. Busca por descripción o por materia sin importar mayúsculas ni tildes. El filtro y la búsqueda no se guardan al recargar y no cambian la vista semanal.
 - **Resumen:** el encabezado saluda según la hora del día y cuenta las entregas vencidas, las de hoy y las de los próximos 7 días.
 - **Avisos:** notificación del navegador cuando faltan 24 horas o menos para una entrega (requiere permiso). Solo funciona con la página abierta: revisa al abrirla y cada minuto.
-- **Clases virtuales, Moodle y Classroom:** guarda por materia el enlace de Meet, Zoom o Teams, del aula de Moodle y de la clase de Google Classroom, y ábrelo con un clic. Si el enlace no empieza por `http://` o `https://`, la app le agrega `https://`.
+- **Clases virtuales, Moodle y Classroom:** guarda por materia el enlace de Meet, Zoom o Teams, del aula de Moodle y de la clase de Google Classroom, y ábrelo con un clic. Si el enlace no empieza por `http://` o `https://`, la app le agrega `https://`. Con **Editar** puedes quitar de una de estas secciones las materias que no la usan: se borra su enlace ahí, pero la materia sigue en las demás, y puedes mostrarla de nuevo cuando quieras.
 - **Drive:** acceso directo a Google Drive y a las carpetas o enlaces que uses seguido.
-- **Materias:** agrega o quita materias; aparecen en todas las secciones. Cada una recibe un color propio para reconocerla de un vistazo, y puedes reordenarlas arrastrándolas o con las flechas. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
+- **Materias:** agrega o quita materias; aparecen en todas las secciones, salvo donde las quites con Editar. Cada una recibe un color propio para reconocerla de un vistazo, y puedes reordenarlas arrastrándolas o con las flechas. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
 - **Tema:** claro, oscuro o el del sistema, con el selector del encabezado.
 - **Respaldo y deshacer:** exporta e importa tus datos en JSON; borrar o importar se puede deshacer. El archivo lleva la versión del formato y la fecha de exportación. Antes de importar, la app pide confirmación y guarda una copia de los datos actuales; si el archivo no sirve, dice por qué.
 - **Atajos de teclado:** `/` busca entregas y `n` empieza una entrega nueva.
@@ -145,6 +145,7 @@ mi-u.html       versión anterior, en un solo archivo
 - [x] Deshacer al borrar
 - [x] Pruebas unitarias para la lógica de fechas y estados
 - [x] Atajos de teclado
+- [x] Quitar materias de Clases virtuales, Moodle o Classroom sin borrarlas
 - [ ] Elegir a mano el color de cada materia (hoy se asigna solo)
 
 ## Pendientes

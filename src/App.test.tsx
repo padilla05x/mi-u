@@ -7,20 +7,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
 import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION, type AlmacenWeb } from './lib/almacen.ts';
 import { crearStore } from './lib/store.ts';
-import type { Datos, Entrega, Materia } from './lib/tipos.ts';
+import type { Datos, Entrega, Materia, SeccionEnlace } from './lib/tipos.ts';
 import { storageFalso } from './test/storage-falso.ts';
 
 // Miércoles 14 de octubre de 2026, 9:00 a. m. en Bogotá.
 const AHORA = new Date('2026-10-14T09:00:00-05:00');
 
-const materia = (id: string, nombre: string, enlaces: Partial<Pick<Materia, 'clase' | 'moodle' | 'classroom'>> = {}): Materia => ({
+const materia = (
+  id: string,
+  nombre: string,
+  extra: Partial<Pick<Materia, 'clase' | 'moodle' | 'classroom' | 'ocultaEn'>> = {},
+): Materia => ({
   id,
   nombre,
   color: 'orquidea',
   clase: '',
   moodle: '',
   classroom: '',
-  ...enlaces,
+  ocultaEn: [],
+  ...extra,
 });
 
 const entrega = (id: string, materiaId: string, texto: string, fecha: string): Entrega => ({
@@ -263,6 +268,159 @@ describe('Enlaces por materia', () => {
       moodle: 'https://moodle.u.edu.co/course/7',
       classroom: '',
     });
+  });
+});
+
+const SECCIONES_ENLACE: { titulo: string; campo: SeccionEnlace }[] = [
+  { titulo: 'Clases virtuales', campo: 'clase' },
+  { titulo: 'Aula virtual (Moodle)', campo: 'moodle' },
+  { titulo: 'Classroom', campo: 'classroom' },
+];
+const ENLACES_FISICA: Record<SeccionEnlace, string> = {
+  clase: 'meet.google.com/fis',
+  moodle: 'moodle.u.edu.co/fis',
+  classroom: 'classroom.google.com/fis',
+};
+const AYUDA_EDICION = 'Quita una materia de esta sección. Su enlace se borra, pero la materia sigue en las demás.';
+const TODAS_OCULTAS = 'Todas las materias están ocultas en esta sección. Usa Editar para mostrarlas de nuevo.';
+
+describe.each(SECCIONES_ENLACE)('Modo edición en $titulo', ({ titulo, campo }) => {
+  const otras = SECCIONES_ENLACE.filter((s) => s.campo !== campo);
+  const montarConEnlaces = () =>
+    montar({
+      materias: [materia('m1', 'Física', ENLACES_FISICA), materia('m2', 'Química')],
+      entregas: [entrega('e1', 'm1', 'Taller de Física', '2026-10-20T20:00:00-05:00')],
+      drive: [],
+    });
+  const abrirDialogoQuitar = async (usuario: ReturnType<typeof userEvent.setup>, tarjeta: HTMLElement) => {
+    await usuario.click(within(tarjeta).getByRole('button', { name: 'Editar' }));
+    await usuario.click(within(tarjeta).getByRole('button', { name: `Quitar Física de ${titulo}` }));
+    return screen.getByRole('dialog', { name: `¿Quitar Física de ${titulo}?` });
+  };
+
+  it('entra y sale de edición: el botón pasa de "Editar" a "Listo" y la ayuda describe la tarjeta', async () => {
+    const { usuario, guardado } = montarConEnlaces();
+    const tarjeta = seccion(titulo);
+    expect(within(tarjeta).queryByRole('button', { name: /^Quitar / })).not.toBeInTheDocument();
+    expect(tarjeta).not.toHaveAccessibleDescription();
+
+    await usuario.click(within(tarjeta).getByRole('button', { name: 'Editar' }));
+
+    const listo = within(tarjeta).getByRole('button', { name: 'Listo' });
+    expect(within(tarjeta).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(tarjeta).toHaveAccessibleDescription(AYUDA_EDICION);
+    for (const otra of otras) expect(within(seccion(otra.titulo)).getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+
+    // Tab recorre cada fila en orden: campo, Abrir (si hay enlace) y Quitar.
+    within(tarjeta).getByLabelText('Enlace de Física').focus();
+    await usuario.tab();
+    expect(within(tarjeta).getByRole('button', { name: 'Abrir Física' })).toHaveFocus();
+    await usuario.tab();
+    expect(within(tarjeta).getByRole('button', { name: `Quitar Física de ${titulo}` })).toHaveFocus();
+    await usuario.tab();
+    expect(within(tarjeta).getByLabelText('Enlace de Química')).toHaveFocus();
+
+    // El campo de enlace funciona igual que en modo normal.
+    await usuario.type(within(tarjeta).getByLabelText('Enlace de Química'), 'u.edu.co/qui{Enter}');
+    expect(guardado().materias[1][campo]).toBe('u.edu.co/qui');
+
+    await usuario.click(listo);
+    expect(within(tarjeta).getByRole('button', { name: 'Editar' })).toHaveFocus();
+    expect(within(tarjeta).queryByRole('button', { name: /^Quitar / })).not.toBeInTheDocument();
+    expect(tarjeta).not.toHaveAccessibleDescription();
+  });
+
+  it('quitar pide confirmación; Cancelar y Esc no cambian nada y devuelven el foco al botón', async () => {
+    const { usuario, guardado } = montarConEnlaces();
+    const antes = guardado();
+    const tarjeta = seccion(titulo);
+
+    const dialogo = await abrirDialogoQuitar(usuario, tarjeta);
+    const quitar = within(tarjeta).getByRole('button', { name: `Quitar Física de ${titulo}` });
+    expect(dialogo).toHaveAttribute('aria-modal', 'true');
+    expect(dialogo).toHaveAccessibleDescription(
+      'Se borrará su enlace en esta sección. La materia y sus enlaces en las demás secciones no cambian.',
+    );
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    expect(within(dialogo).getByRole('button', { name: 'Quitar' })).toBeInTheDocument();
+
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(quitar).toHaveFocus();
+
+    await usuario.keyboard('{Enter}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await usuario.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(quitar).toHaveFocus();
+
+    expect(within(tarjeta).getByLabelText('Enlace de Física')).toHaveValue(ENLACES_FISICA[campo]);
+    expect(guardado()).toEqual(antes);
+  });
+
+  it('confirmar borra el enlace y oculta la fila; la materia sigue en todo lo demás y "Mostrar" la devuelve vacía', async () => {
+    const { usuario, guardado } = montarConEnlaces();
+    const tarjeta = seccion(titulo);
+
+    const dialogo = await abrirDialogoQuitar(usuario, tarjeta);
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Quitar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(tarjeta).queryByLabelText('Enlace de Física')).not.toBeInTheDocument();
+    expect(within(tarjeta).getByRole('button', { name: 'Listo' })).toHaveFocus(); // Su botón ya no existe.
+    expect(guardado().materias[0]).toMatchObject({ [campo]: '', ocultaEn: [campo] });
+    for (const otra of otras) {
+      expect(within(seccion(otra.titulo)).getByLabelText('Enlace de Física')).toHaveValue(ENLACES_FISICA[otra.campo]);
+      expect(guardado().materias[0][otra.campo]).toBe(ENLACES_FISICA[otra.campo]);
+    }
+    expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
+    expect(within(seccion('Entregas')).getByRole('option', { name: 'Física' })).toBeInTheDocument();
+    expect(filasEntregas()[0]).toHaveTextContent('Física');
+
+    const ocultas = within(tarjeta).getByRole('list', { name: 'Ocultas aquí (1)' });
+    expect(within(ocultas).getByRole('listitem')).toHaveTextContent('Física');
+    await usuario.click(within(ocultas).getByRole('button', { name: `Mostrar Física en ${titulo}` }));
+
+    // Vuelve en su lugar, con el campo vacío y enfocado para pegar el enlace de nuevo.
+    const campoFisica = within(tarjeta).getByLabelText('Enlace de Física');
+    expect(campoFisica).toHaveValue('');
+    expect(campoFisica).toHaveFocus();
+    expect(within(tarjeta).getAllByLabelText(/^Enlace de /).map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Enlace de Física',
+      'Enlace de Química',
+    ]);
+    expect(within(tarjeta).queryByText(/Ocultas aquí/)).not.toBeInTheDocument();
+    expect(guardado().materias[0]).toMatchObject({ [campo]: '', ocultaEn: [] });
+  });
+
+  it('al quitar la última visible, en modo normal avisa que todas están ocultas', async () => {
+    const { usuario } = montar({
+      materias: [materia('m1', 'Física'), materia('m2', 'Química', { ocultaEn: [campo] })],
+      entregas: [],
+      drive: [],
+    });
+    const tarjeta = seccion(titulo);
+    expect(within(tarjeta).getAllByLabelText(/^Enlace de /)).toHaveLength(1);
+
+    const dialogo = await abrirDialogoQuitar(usuario, tarjeta);
+    expect(within(tarjeta).getByRole('list', { name: 'Ocultas aquí (1)' })).toHaveTextContent('Química');
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Quitar' }));
+
+    expect(within(tarjeta).queryAllByLabelText(/^Enlace de /)).toHaveLength(0);
+    expect(within(tarjeta).getByRole('list', { name: 'Ocultas aquí (2)' })).toBeInTheDocument();
+    expect(within(tarjeta).queryByText(TODAS_OCULTAS)).not.toBeInTheDocument();
+
+    await usuario.click(within(tarjeta).getByRole('button', { name: 'Listo' }));
+
+    expect(within(tarjeta).getByText(TODAS_OCULTAS)).toBeInTheDocument();
+    expect(within(tarjeta).queryByRole('list')).not.toBeInTheDocument();
+    for (const otra of otras) expect(within(seccion(otra.titulo)).queryByText(TODAS_OCULTAS)).not.toBeInTheDocument();
+    expect(within(seccion('Mis materias')).getByText('Química')).toBeInTheDocument();
+  });
+
+  it('sin materias no muestra el botón Editar', () => {
+    montar({ materias: [], entregas: [], drive: [] });
+    expect(within(seccion(titulo)).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
   });
 });
 

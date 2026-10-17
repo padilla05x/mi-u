@@ -1,7 +1,7 @@
 import { esColorMateria, siguienteColor, type ColorMateria } from './colores.ts';
 import { nuevoId } from './datos.ts';
 import { aIsoBogota, esIsoBogota } from './fechas.ts';
-import type { Datos, DriveLink, Entrega, Materia } from './tipos.ts';
+import type { Datos, DriveLink, Entrega, Materia, SeccionEnlace } from './tipos.ts';
 
 export const CLAVE = 'mi-u-v1';
 export const CLAVE_CORRUPTO = 'mi-u-v1-corrupto';
@@ -104,7 +104,7 @@ function localStorageDelNavegador(): AlmacenWeb | null {
 
 function estadoInicial(): Datos {
   return {
-    materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '' }))),
+    materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '', ocultaEn: [] }))),
     entregas: [],
     drive: [],
   };
@@ -152,7 +152,7 @@ interface OpcionesValidacion {
 
 /**
  * Reglas de los datos de Mi U, para la carga de localStorage y para importar respaldos. Migra el formato viejo
- * (fechas en milisegundos y materias sin color) y conserva los campos que no conoce.
+ * (fechas en milisegundos, materias sin color y sin ocultaEn) y conserva los campos que no conoce.
  */
 export function validarDatos(valor: unknown, { coloresEstrictos = false }: OpcionesValidacion = {}): Validacion {
   if (!esObjeto(valor)) return { ok: false, motivo: 'El archivo no contiene datos de Mi U.' };
@@ -163,7 +163,7 @@ export function validarDatos(valor: unknown, { coloresEstrictos = false }: Opcio
     motivoLista(valor.drive, 'drive', motivoDriveLink);
   if (motivo) return { ok: false, motivo };
   // Las tres listas ya pasaron sus reglas.
-  const materias = valor.materias as (Omit<Materia, 'color'> & { color?: unknown })[];
+  const materias = (valor.materias as MateriaGuardada[]).map(migrarMateria);
   return {
     ok: true,
     datos: { ...valor, materias: asignarColores(materias), entregas: entregas as Entrega[], drive: valor.drive as DriveLink[] },
@@ -179,6 +179,11 @@ function asignarColores<T extends Record<string, unknown>>(materias: T[]): (T & 
     usados.push(color);
     return { ...m, color };
   });
+}
+
+/** Las materias guardadas antes de poder quitarlas de una sección no traen ocultaEn: no están ocultas en ninguna. */
+function migrarMateria<T extends { ocultaEn?: SeccionEnlace[] }>(materia: T): T & { ocultaEn: SeccionEnlace[] } {
+  return { ...materia, ocultaEn: materia.ocultaEn ?? [] };
 }
 
 /** mi-u.html guardaba la fecha en milisegundos; ahora es texto ISO con el desfase de Bogotá. */
@@ -233,15 +238,35 @@ function motivoCampos(
   return null;
 }
 
+// Record obliga a listar todas las secciones del tipo.
+const SECCIONES: Record<SeccionEnlace, true> = { clase: true, moodle: true, classroom: true };
+
+function esSeccionEnlace(valor: unknown): valor is SeccionEnlace {
+  return typeof valor === 'string' && Object.hasOwn(SECCIONES, valor);
+}
+
+const esListaDeSecciones = (valor: unknown) => Array.isArray(valor) && valor.every(esSeccionEnlace);
+const motivoSecciones = (valor: unknown) =>
+  Array.isArray(valor)
+    ? `tiene ${JSON.stringify(valor.find((s) => !esSeccionEnlace(s)))}, que no es una sección (clase, moodle o classroom)`
+    : 'no es una lista';
+
 const esTexto = (valor: unknown) => typeof valor === 'string';
 const esBooleano = (valor: unknown) => typeof valor === 'boolean';
 
+/**
+ * Una materia guardada. El color puede faltar (datos de mi-u.html) porque se asigna al cargar, y ocultaEn
+ * (datos anteriores) porque empieza vacío; si está, solo puede nombrar las tres secciones de enlaces.
+ */
+type MateriaGuardada = Omit<Materia, 'color' | 'ocultaEn'> & { color?: unknown; ocultaEn?: SeccionEnlace[] };
+
 function motivoMateria(valor: unknown, n: number, coloresEstrictos: boolean): Motivo {
   const quien = cual('la materia', n, valor, 'nombre');
+  const tiene = (campo: string) => esObjeto(valor) && valor[campo] !== undefined;
   return (
     motivoCampos(valor, quien, [[['id', 'nombre', 'clase', 'moodle', 'classroom'], esTexto, 'no es texto']]) ??
-    // El color puede faltar (datos de mi-u.html): se asigna en asignarColores.
-    (coloresEstrictos && esObjeto(valor) && valor.color !== undefined
+    (tiene('ocultaEn') ? motivoCampos(valor, quien, [[['ocultaEn'], esListaDeSecciones, motivoSecciones]]) : null) ??
+    (coloresEstrictos && tiene('color')
       ? motivoCampos(valor, quien, [[['color'], esColorMateria, (color) => `es ${JSON.stringify(color)}, que no es un color de Mi U`]])
       : null)
   );

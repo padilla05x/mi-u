@@ -10,8 +10,11 @@ export const botonPrincipal = `${botonBase} bg-acento text-sobre-acento enabled:
 export const botonSecundario = `${botonBase} bg-acento-suave text-acento enabled:hover:shadow-[inset_0_0_0_1px_var(--color-acento)]`;
 /** Confirma una acción que borra, como "Quitar materia" en el diálogo de confirmación. */
 export const botonPeligro = `${botonBase} bg-peligro-suave text-peligro enabled:hover:shadow-[inset_0_0_0_1px_var(--color-peligro)]`;
+const baseIcono = `inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] text-tenue ${transicion}`;
 /** Botón solo de icono (borrar y quitar); necesita aria-label. */
-export const botonIcono = `inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] text-tenue ${transicion} hover:bg-superficie hover:text-texto`;
+export const botonIcono = `${baseIcono} hover:bg-superficie hover:text-texto`;
+/** Quitar una materia de una sección en modo edición: tenue en reposo y en peligro al pasar el puntero o enfocarlo. */
+export const botonIconoPeligro = `${baseIcono} hover:bg-peligro-suave hover:text-peligro focus-visible:bg-peligro-suave focus-visible:text-peligro`;
 
 export const campo = `h-10 w-full min-w-0 rounded-[10px] border border-borde-control bg-tarjeta px-3 text-[14px] leading-5 text-texto ${transicion} focus:border-acento`;
 export const fila = `-mx-2 border-b border-borde px-2 py-3 last:border-b-0 ${transicion} hover:bg-superficie`;

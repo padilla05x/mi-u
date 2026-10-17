@@ -1,6 +1,9 @@
 // Forma de los datos que Mi U guarda en localStorage (clave "mi-u-v1").
 import type { ColorMateria } from './colores.ts';
 
+/** Secciones con un enlace por materia: Clases virtuales, Aula virtual (Moodle) y Classroom. Es también el campo del enlace. */
+export type SeccionEnlace = 'clase' | 'moodle' | 'classroom';
+
 export interface Materia {
   id: string;
   nombre: string;
@@ -12,6 +15,8 @@ export interface Materia {
   moodle: string;
   /** Enlace de la clase en Google Classroom. */
   classroom: string;
+  /** Secciones de las que se quitó: ahí no aparece, pero sigue en las demás, en Entregas y en Mis materias. */
+  ocultaEn: SeccionEnlace[];
 }
 
 export interface Entrega {

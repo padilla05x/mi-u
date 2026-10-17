@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { exportar, importar, VERSION_MAS_NUEVA } from './respaldo.ts';
-import type { Datos } from './tipos.ts';
+import { materiasVisibles } from './secciones.ts';
+import type { Datos, Materia } from './tipos.ts';
 
 const datos: Datos = {
   materias: [
@@ -11,6 +12,7 @@ const datos: Datos = {
       clase: '',
       moodle: '',
       classroom: '',
+      ocultaEn: [],
     },
   ],
   entregas: [
@@ -112,5 +114,60 @@ describe('importar: mismas reglas que la carga', () => {
       drive: datos.drive,
     });
     expect(importar(viejo)).toEqual({ ok: true, datos });
+  });
+
+  it('acepta ocultaEn con las tres secciones, y lo completa con [] en respaldos anteriores', () => {
+    const conOcultas: Datos = { ...datos, materias: [{ ...datos.materias[0], ocultaEn: ['clase', 'moodle', 'classroom'] }] };
+    expect(importar(exportar(conOcultas, AHORA))).toEqual({ ok: true, datos: conOcultas });
+
+    const vieja: Partial<Materia> = { ...datos.materias[0] };
+    delete vieja.ocultaEn;
+    expect(importar(JSON.stringify({ ...datos, materias: [vieja] }))).toEqual({ ok: true, datos });
+  });
+
+  it('rechaza el archivo si ocultaEn tiene algo que no sea una de las tres secciones', () => {
+    const conOcultaEn = (ocultaEn: unknown) => JSON.stringify({ ...datos, materias: [{ ...datos.materias[0], ocultaEn }] });
+    const noEsSeccion = (valor: string) =>
+      `El campo "ocultaEn" de la materia 1 ("Física") tiene ${valor}, que no es una sección (clase, moodle o classroom).`;
+    const noEsLista = 'El campo "ocultaEn" de la materia 1 ("Física") no es una lista.';
+    expect(importar(conOcultaEn(['drive']))).toEqual({ ok: false, motivo: noEsSeccion('"drive"') });
+    expect(importar(conOcultaEn(['moodle', 'Moodle']))).toEqual({ ok: false, motivo: noEsSeccion('"Moodle"') });
+    expect(importar(conOcultaEn(['moodle', 1]))).toEqual({ ok: false, motivo: noEsSeccion('1') });
+    expect(importar(conOcultaEn('moodle'))).toEqual({ ok: false, motivo: noEsLista });
+    expect(importar(conOcultaEn(null))).toEqual({ ok: false, motivo: noEsLista });
+  });
+});
+
+describe('importar: secciones ocultas (ocultaEn)', () => {
+  /** Un respaldo exportado por la app, con la materia cambiada. */
+  const respaldoConMateria = (materia: Record<string, unknown>) =>
+    JSON.stringify({ version: 1, fechaExportacion: '2026-10-14T20:30:00-05:00', ...datos, materias: [materia] });
+
+  it('un respaldo sin ocultaEn deja la materia con ocultaEn: [], y las secciones la muestran', () => {
+    const vieja: Partial<Materia> = { ...datos.materias[0] };
+    delete vieja.ocultaEn;
+
+    const resultado = importar(respaldoConMateria(vieja));
+
+    expect(resultado).toEqual({ ok: true, datos });
+    // Sin la migración, secciones.ts fallaría al leer ocultaEn.
+    expect(resultado.ok && materiasVisibles(resultado.datos.materias, 'clase').map((m) => m.id)).toEqual(['m1']);
+  });
+
+  it('un respaldo con ocultaEn: ["clase"] lo conserva', () => {
+    const resultado = importar(respaldoConMateria({ ...datos.materias[0], ocultaEn: ['clase'] }));
+
+    expect(resultado).toEqual({ ok: true, datos: { ...datos, materias: [{ ...datos.materias[0], ocultaEn: ['clase'] }] } });
+    expect(resultado.ok && materiasVisibles(resultado.datos.materias, 'clase')).toEqual([]);
+  });
+
+  it('un ocultaEn inválido devuelve su motivo concreto y no trae datos', () => {
+    const resultado = importar(respaldoConMateria({ ...datos.materias[0], ocultaEn: ['inventada'] }));
+
+    expect(resultado).toEqual({
+      ok: false,
+      motivo: 'El campo "ocultaEn" de la materia 1 ("Física") tiene "inventada", que no es una sección (clase, moodle o classroom).',
+    });
+    expect('datos' in resultado).toBe(false);
   });
 });
