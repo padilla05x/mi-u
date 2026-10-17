@@ -26,6 +26,16 @@ export function quitarMateria(datos: Datos, id: string): Datos {
   };
 }
 
+/** Pone la materia `id` en la posición `destino` (índice final); no hace nada si no existe o ya está ahí. */
+export function moverMateria(datos: Datos, id: string, destino: number): Datos {
+  const desde = datos.materias.findIndex((m) => m.id === id);
+  const hasta = Math.min(Math.max(destino, 0), datos.materias.length - 1);
+  if (desde < 0 || desde === hasta) return datos;
+  const materias = [...datos.materias];
+  materias.splice(hasta, 0, ...materias.splice(desde, 1));
+  return { ...datos, materias };
+}
+
 export function guardarEnlace(datos: Datos, id: string, campo: CampoEnlace, url: string): Datos {
   return { ...datos, materias: datos.materias.map((m) => (m.id === id ? { ...m, [campo]: url } : m)) };
 }

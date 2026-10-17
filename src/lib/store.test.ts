@@ -44,4 +44,21 @@ describe('crearStore', () => {
     bloqueado.actualizar((datos) => datos);
     expect(bloqueado.obtener().avisos).toHaveLength(1);
   });
+
+  it("deshace solo el último cambio deshacible y lo descarta ante cualquier otro cambio", () => {
+    const store = crearStore(abrirAlmacen(storageFalso()));
+    const antes = store.obtener().datos;
+
+    store.actualizar((datos) => ({ ...datos, materias: [] }), "Materias borradas");
+    expect(store.obtener().deshacer).toBe("Materias borradas");
+    store.deshacer();
+    expect(store.obtener().datos).toBe(antes);
+    expect(store.obtener().deshacer).toBeNull();
+
+    store.actualizar((datos) => ({ ...datos, materias: [] }), "Materias borradas");
+    store.actualizar((datos) => agregarMateria(datos, "Física"));
+    expect(store.obtener().deshacer).toBeNull();
+    store.deshacer();
+    expect(store.obtener().datos.materias.map((m) => m.nombre)).toEqual(["Física"]);
+  });
 });

@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react';
+import { TriangleAlert, X } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import AulaMoodle from './components/AulaMoodle.tsx';
 import ClasesVirtuales from './components/ClasesVirtuales.tsx';
@@ -7,7 +7,10 @@ import Drive from './components/Drive.tsx';
 import Encabezado from './components/Encabezado.tsx';
 import Entregas from './components/Entregas.tsx';
 import Materias from './components/Materias.tsx';
+import Respaldo from './components/Respaldo.tsx';
+import { botonIcono, botonSecundario } from './components/estilos.ts';
 import { useAhora } from './hooks/useAhora.ts';
+import { useAtajos } from './hooks/useAtajos.ts';
 import { useAvisos } from './hooks/useAvisos.ts';
 import {
   agregarDrive,
@@ -17,6 +20,7 @@ import {
   borrarEntrega,
   guardarEnlace,
   marcarAvisadas,
+  moverMateria,
   nombreMateria,
   quitarDrive,
   quitarMateria,
@@ -26,8 +30,9 @@ import { resumenEntregas } from './lib/entregas.ts';
 import type { Store } from './lib/store.ts';
 
 export default function App({ store }: { store: Store }) {
-  const { datos, avisos } = useSyncExternalStore(store.suscribir, store.obtener);
+  const { datos, avisos, deshacer } = useSyncExternalStore(store.suscribir, store.obtener);
   const ahora = useAhora();
+  useAtajos();
   const nombreDe = (id: string) => nombreMateria(datos.materias, id);
   const avisosNavegador = useAvisos(datos.entregas, nombreDe, (ids) => store.actualizar((d) => marcarAvisadas(d, ids)));
   const guardarEnlaceDe = (id: string, campo: CampoEnlace, url: string) =>
@@ -57,7 +62,7 @@ export default function App({ store }: { store: Store }) {
           onPedirAvisos={avisosNavegador.pedirPermiso}
           onAgregar={(entrega) => store.actualizar((d) => agregarEntrega(d, entrega))}
           onAlternar={(id) => store.actualizar((d) => alternarEntrega(d, id))}
-          onBorrar={(id) => store.actualizar((d) => borrarEntrega(d, id))}
+          onBorrar={(id) => store.actualizar((d) => borrarEntrega(d, id), 'Entrega borrada')}
         />
         <ClasesVirtuales className="lg:col-span-2" materias={datos.materias} onGuardar={guardarEnlaceDe} />
         <AulaMoodle className="lg:col-span-2" materias={datos.materias} onGuardar={guardarEnlaceDe} />
@@ -66,15 +71,37 @@ export default function App({ store }: { store: Store }) {
           className="lg:col-span-3"
           enlaces={datos.drive}
           onAgregar={(nombre, url) => store.actualizar((d) => agregarDrive(d, nombre, url))}
-          onQuitar={(id) => store.actualizar((d) => quitarDrive(d, id))}
+          onQuitar={(id) => store.actualizar((d) => quitarDrive(d, id), 'Enlace quitado')}
         />
         <Materias
           className="md:col-span-2 lg:col-span-3"
           materias={datos.materias}
           onAgregar={(nombre) => store.actualizar((d) => agregarMateria(d, nombre))}
-          onQuitar={(id) => store.actualizar((d) => quitarMateria(d, id))}
+          onQuitar={(id) => store.actualizar((d) => quitarMateria(d, id), 'Materia quitada')}
+          onMover={(id, destino) => store.actualizar((d) => moverMateria(d, id, destino))}
+        />
+        <Respaldo
+          className="md:col-span-2 lg:col-span-6"
+          datos={datos}
+          onImportar={(nuevos) => store.actualizar(() => nuevos, 'Datos importados')}
         />
       </main>
+      {deshacer && (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-4 z-10 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-borde bg-tarjeta px-4 py-3 text-[14px] shadow-[var(--sombra-tarjeta)]"
+        >
+          {deshacer}
+          <span className="flex gap-2">
+            <button type="button" className={botonSecundario} onClick={store.deshacer}>
+              Deshacer
+            </button>
+            <button type="button" className={botonIcono} aria-label="Cerrar aviso" onClick={store.descartarDeshacer}>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+      )}
     </>
   );
 }

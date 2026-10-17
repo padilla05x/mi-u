@@ -1,9 +1,26 @@
+<div align="center">
+
+<img src="docs/img/logo.svg" alt="Logo animado de Mi U: una U que se dibuja y se marca como entregada" width="120" height="120">
+
 # Mi U
 
-Panel personal para organizar la vida universitaria en un solo lugar: entregas, clases virtuales, aulas de Moodle, Google Classroom y Google Drive.
+**Tu vida universitaria en un solo panel.**
+Entregas, clases virtuales, Moodle, Classroom y Drive, sin cuentas ni servidores.
 
 ![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
+![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=white)
+![Datos](https://img.shields.io/badge/datos-solo%20en%20tu%20navegador-4f46e5)
+
+[Funciones](#funciones) · [Así se ve](#así-se-ve) · [Instalación](#instalación-y-uso) · [Privacidad](#datos-y-privacidad) · [Desarrollo](#desarrollo)
+
+<img src="docs/img/demo.gif" alt="Demostración: agregar una entrega con el atajo n, filtrar vencidas, buscar y cambiar de tema" width="760">
+
+<sub>Atajo `n` para una entrega nueva, filtro de vencidas, búsqueda con `/` y cambio de tema.
+<a href="docs/img/demo.mp4">Ver el video en mejor calidad</a>.</sub>
+
+</div>
 
 ## Funciones
 
@@ -15,10 +32,27 @@ Panel personal para organizar la vida universitaria en un solo lugar: entregas, 
 - **Avisos:** notificación del navegador cuando faltan 24 horas o menos para una entrega (requiere permiso). Solo funciona con la página abierta: revisa al abrirla y cada minuto.
 - **Clases virtuales, Moodle y Classroom:** guarda por materia el enlace de Meet, Zoom o Teams, del aula de Moodle y de la clase de Google Classroom, y ábrelo con un clic. Si el enlace no empieza por `http://` o `https://`, la app le agrega `https://`.
 - **Drive:** acceso directo a Google Drive y a las carpetas o enlaces que uses seguido.
-- **Materias:** agrega o quita materias; aparecen en todas las secciones. Cada una recibe un color propio para reconocerla de un vistazo. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
+- **Materias:** agrega o quita materias; aparecen en todas las secciones. Cada una recibe un color propio para reconocerla de un vistazo, y puedes reordenarlas arrastrándolas o con las flechas. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
 - **Tema:** claro, oscuro o el del sistema, con el selector del encabezado.
+- **Respaldo y deshacer:** exporta e importa tus datos en JSON; borrar o importar se puede deshacer.
+- **Atajos de teclado:** `/` busca entregas y `n` empieza una entrega nueva.
 
 Todas las fechas se calculan y se muestran en hora de Bogotá (UTC−5), aunque el equipo esté en otra zona horaria.
+
+## Así se ve
+
+| Claro | Oscuro |
+|---|---|
+| <img src="docs/img/claro.png" alt="Mi U en tema claro" width="480"> | <img src="docs/img/oscuro.png" alt="Mi U en tema oscuro" width="480"> |
+
+<details>
+<summary>En el celular</summary>
+
+<img src="docs/img/movil.png" alt="Mi U en una pantalla de celular, con las secciones apiladas" width="300">
+
+</details>
+
+Las capturas usan datos de ejemplo.
 
 ## Requisitos
 
@@ -74,7 +108,7 @@ Ojo: el paso 2 reemplaza lo que ya tengas guardado en la versión nueva.
   - `mi-u-v1-corrupto`: copia que se crea si los datos guardados aparecen dañados (si ya existe, la siguiente es `mi-u-v1-corrupto-2` y así sucesivamente).
 - **Nada se borra en silencio.** Si los datos están dañados, se guarda esa copia, se carga el estado inicial y la app lo avisa. Si el almacenamiento está lleno o el navegador lo bloquea, la app sigue funcionando en memoria y muestra un aviso.
 - **Por navegador y dirección.** Si cambias de navegador, de equipo o de dirección, los datos no se transfieren solos.
-- **Respaldo.** Antes de limpiar los datos del navegador, conviene exportar un respaldo (cuando esté disponible la función de exportar).
+- **Respaldo.** Antes de limpiar los datos del navegador, conviene exportar un respaldo en JSON desde la app.
 
 ## Estructura del proyecto
 
@@ -88,6 +122,7 @@ src/
   index.css     paleta y estilos base (Tailwind CSS)
 docs/
   diseno.md     paleta, contraste, tipografía, iconos y reglas de la interfaz
+  img/          logo animado, capturas y video de la demo
 mi-u.html       versión anterior, en un solo archivo
 ```
 
@@ -104,11 +139,11 @@ mi-u.html       versión anterior, en un solo archivo
 - [x] Rediseño visual con modo claro y oscuro
 - [x] Vista semanal de entregas
 - [x] Filtros y búsqueda
-- [ ] Ordenar materias arrastrándolas
-- [ ] Exportar e importar datos en JSON
-- [ ] Deshacer al borrar
+- [x] Ordenar materias arrastrándolas
+- [x] Exportar e importar datos en JSON
+- [x] Deshacer al borrar
 - [x] Pruebas unitarias para la lógica de fechas y estados
-- [ ] Atajos de teclado
+- [x] Atajos de teclado
 - [ ] Elegir a mano el color de cada materia (hoy se asigna solo)
 
 ## Pendientes

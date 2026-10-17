@@ -1,4 +1,4 @@
-import { BookOpen, BookPlus, Plus, Trash } from 'lucide-react';
+import { BookOpen, BookPlus, ChevronDown, ChevronUp, GripVertical, Plus, Trash } from 'lucide-react';
 import { useState } from 'react';
 import type { Materia } from '../lib/tipos.ts';
 import Campo from './Campo.tsx';
@@ -12,11 +12,14 @@ interface Props {
   onAgregar: (nombre: string) => void;
   /** Quita la materia con sus enlaces y sus entregas. */
   onQuitar: (id: string) => void;
+  /** Pone la materia en la posición `destino`. */
+  onMover: (id: string, destino: number) => void;
   className?: string;
 }
 
-export default function Materias({ materias, onAgregar, onQuitar, className }: Props) {
+export default function Materias({ materias, onAgregar, onQuitar, onMover, className }: Props) {
   const [nombre, setNombre] = useState('');
+  const [arrastrando, setArrastrando] = useState<string | null>(null);
 
   const agregar = () => {
     const nombreLimpio = nombre.trim();
@@ -41,12 +44,41 @@ export default function Materias({ materias, onAgregar, onQuitar, className }: P
         />
       ) : (
         <ul>
-          {materias.map((m) => (
-            <li key={m.id} className={`${fila} flex items-center gap-3`}>
+          {materias.map((m, i) => (
+            <li
+              key={m.id}
+              draggable
+              onDragStart={() => setArrastrando(m.id)}
+              onDragEnd={() => setArrastrando(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => arrastrando && onMover(arrastrando, i)}
+              className={`${fila} flex items-center gap-3 ${arrastrando === m.id ? 'opacity-50' : ''}`}
+            >
+              <GripVertical size={18} className="shrink-0 cursor-grab text-tenue" aria-hidden="true" />
               <PuntoMateria color={m.color} />
               <span className={`${tituloElemento} min-w-0 flex-1 truncate`} title={m.nombre}>
                 {m.nombre}
               </span>
+              <button
+                type="button"
+                className={botonIcono}
+                title="Subir"
+                aria-label={`Subir ${m.nombre}`}
+                disabled={i === 0}
+                onClick={() => onMover(m.id, i - 1)}
+              >
+                <ChevronUp size={18} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={botonIcono}
+                title="Bajar"
+                aria-label={`Bajar ${m.nombre}`}
+                disabled={i === materias.length - 1}
+                onClick={() => onMover(m.id, i + 1)}
+              >
+                <ChevronDown size={18} aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 className={botonIcono}

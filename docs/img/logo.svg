@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="160" height="160" role="img" aria-label="Mi U">
+  <style>
+    .u { stroke-dasharray: 1; animation: trazo 4s ease-in-out infinite; }
+    .ok { transform-origin: 24px 24px; animation: marca 4s ease-in-out infinite; }
+    .caja { transform-origin: 16px 16px; animation: latir 4s ease-in-out infinite; }
+    @keyframes trazo { 0% { stroke-dashoffset: 1; } 35%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -1; } }
+    @keyframes marca { 0%, 40% { transform: scale(0); } 52% { transform: scale(1.25); } 60%, 85% { transform: scale(1); } 100% { transform: scale(0); } }
+    @keyframes latir { 0%, 38% { transform: scale(1); } 46% { transform: scale(1.04); } 54%, 100% { transform: scale(1); } }
+    @media (prefers-reduced-motion: reduce) { .u, .ok, .caja { animation: none; } .u { stroke-dashoffset: 0; } .ok { transform: scale(1); } }
+  </style>
+  <g class="caja">
+    <rect width="32" height="32" rx="7" fill="#4f46e5"/>
+    <path class="u" pathLength="1" d="M10 8v9a6 6 0 0 0 12 0V8" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>
+    <g class="ok">
+      <circle cx="24" cy="24" r="5" fill="#22c55e" stroke="#4f46e5" stroke-width="1.5"/>
+      <path d="M21.8 24.2l1.6 1.6 3-3.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

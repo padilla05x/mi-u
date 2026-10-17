@@ -517,6 +517,67 @@ describe('Vista semanal', () => {
   });
 });
 
+describe('Deshacer y respaldo', () => {
+  it('quitar un enlace de Drive se puede deshacer', async () => {
+    const { usuario } = montar({
+      materias: [],
+      entregas: [],
+      drive: [{ id: 'd1', nombre: 'Carpeta de PETI', url: 'https://drive.google.com' }],
+    });
+
+    await usuario.click(screen.getByRole('button', { name: 'Quitar Carpeta de PETI' }));
+    expect(screen.queryByText('Carpeta de PETI')).not.toBeInTheDocument();
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(screen.getByText('Carpeta de PETI')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('importar un respaldo reemplaza los datos y se puede deshacer', async () => {
+    const { usuario, guardado } = montar({ materias: [], entregas: [], drive: [] });
+    const respaldo = JSON.stringify({
+      materias: [materia('m9', 'Física')],
+      entregas: [],
+      drive: [],
+    });
+
+    await usuario.upload(
+      screen.getByLabelText('Archivo de respaldo'),
+      new File([respaldo], 'mi-u.json', { type: 'application/json' }),
+    );
+    expect(await within(seccion('Mis materias')).findByText('Física')).toBeInTheDocument();
+    expect(guardado().materias).toHaveLength(1);
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
+    expect(within(seccion('Mis materias')).queryByText('Física')).not.toBeInTheDocument();
+  });
+});
+
+describe('Orden de materias y atajos', () => {
+  it('sube una materia con su botón y se guarda', async () => {
+    const { usuario, guardado } = montar({ materias: [materia('m1', 'Física'), materia('m2', 'Química')], entregas: [], drive: [] });
+
+    await usuario.click(screen.getByRole('button', { name: 'Subir Química' }));
+    expect(guardado().materias.map((m) => m.nombre)).toEqual(['Química', 'Física']);
+    expect(screen.getByRole('button', { name: 'Subir Química' })).toBeDisabled();
+  });
+
+  it('"n" y "/" enfocan los campos, pero no mientras se escribe', async () => {
+    const { usuario } = montar({
+      materias: [materia('m1', 'Física')],
+      entregas: [entrega('e1', 'm1', 'Taller', '2026-10-20T20:00:00-05:00')],
+      drive: [],
+    });
+
+    await usuario.keyboard('n');
+    expect(screen.getByLabelText('Descripción')).toHaveFocus();
+    await usuario.keyboard('/');
+    expect(screen.getByLabelText('Descripción')).toHaveValue('/');
+    screen.getByLabelText('Descripción').blur();
+    await usuario.keyboard('/');
+    expect(screen.getByLabelText('Buscar entregas')).toHaveFocus();
+  });
+});
+
 describe('Tema', () => {
   const guardado = new Map<string, string>();
   beforeEach(() => {

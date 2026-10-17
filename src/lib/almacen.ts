@@ -105,7 +105,7 @@ function respaldar(storage: AlmacenWeb, crudo: string): string | null {
 }
 
 /** Valida lo guardado y migra el formato viejo; null si el JSON está dañado o la forma no coincide. */
-function interpretar(crudo: string): Datos | null {
+export function interpretar(crudo: string): Datos | null {
   try {
     const valor: unknown = JSON.parse(crudo);
     if (!esObjeto(valor)) return null;
