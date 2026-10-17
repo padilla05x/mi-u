@@ -34,7 +34,7 @@ Entregas, clases virtuales, Moodle, Classroom y Drive, sin cuentas ni servidores
 - **Drive:** acceso directo a Google Drive y a las carpetas o enlaces que uses seguido.
 - **Materias:** agrega o quita materias; aparecen en todas las secciones, salvo donde las quites con Editar. Cada una recibe un color propio para reconocerla de un vistazo, y puedes reordenarlas arrastrándolas o con las flechas. Al quitar una materia, la app pide confirmación y borra también sus enlaces y entregas.
 - **Tema:** claro, oscuro o el del sistema, con el selector del encabezado.
-- **Respaldo y deshacer:** exporta e importa tus datos en JSON; borrar o importar se puede deshacer.
+- **Respaldo y deshacer:** exporta e importa tus datos en JSON; borrar o importar se puede deshacer. El archivo lleva la versión del formato y la fecha de exportación. Antes de importar, la app pide confirmación y guarda una copia de los datos actuales; si el archivo no sirve, dice por qué.
 - **Atajos de teclado:** `/` busca entregas y `n` empieza una entrega nueva.
 
 Todas las fechas se calculan y se muestran en hora de Bogotá (UTC−5), aunque el equipo esté en otra zona horaria.
@@ -106,6 +106,7 @@ Ojo: el paso 2 reemplaza lo que ya tengas guardado en la versión nueva.
   - `mi-u-v1`: materias, entregas y enlaces de Drive.
   - `mi-u-tema`: el tema elegido, solo si no es "Sistema".
   - `mi-u-v1-corrupto`: copia que se crea si los datos guardados aparecen dañados (si ya existe, la siguiente es `mi-u-v1-corrupto-2` y así sucesivamente).
+  - `mi-u-v1-respaldo-importacion`: copia de lo guardado justo antes de la última importación. Si no se puede crear, no se importa nada.
 - **Nada se borra en silencio.** Si los datos están dañados, se guarda esa copia, se carga el estado inicial y la app lo avisa. Si el almacenamiento está lleno o el navegador lo bloquea, la app sigue funcionando en memoria y muestra un aviso.
 - **Por navegador y dirección.** Si cambias de navegador, de equipo o de dirección, los datos no se transfieren solos.
 - **Respaldo.** Antes de limpiar los datos del navegador, conviene exportar un respaldo en JSON desde la app.

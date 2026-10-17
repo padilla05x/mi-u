@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.tsx';
-import { abrirAlmacen, CLAVE, type AlmacenWeb } from './lib/almacen.ts';
+import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION, type AlmacenWeb } from './lib/almacen.ts';
 import { crearStore } from './lib/store.ts';
 import type { Datos, Entrega, Materia, SeccionEnlace } from './lib/tipos.ts';
 import { storageFalso } from './test/storage-falso.ts';
@@ -824,43 +824,140 @@ describe('Deshacer y respaldo', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('importar un respaldo reemplaza los datos y se puede deshacer', async () => {
-    const { usuario, guardado } = montar({ materias: [], entregas: [], drive: [] });
-    const respaldo = JSON.stringify({
-      materias: [materia('m9', 'Física')],
-      entregas: [],
-      drive: [],
-    });
+  const archivoJson = (texto: string, nombre = 'mi-u.json') => new File([texto], nombre, { type: 'application/json' });
+  const respaldoQuimica = JSON.stringify({ version: 1, materias: [materia('m9', 'Química')], entregas: [], drive: [] });
+  const subir = (usuario: ReturnType<typeof userEvent.setup>, archivo: File) =>
+    usuario.upload(screen.getByLabelText('Archivo de respaldo'), archivo);
 
-    await usuario.upload(
-      screen.getByLabelText('Archivo de respaldo'),
-      new File([respaldo], 'mi-u.json', { type: 'application/json' }),
-    );
-    expect(await within(seccion('Mis materias')).findByText('Física')).toBeInTheDocument();
-    expect(guardado().materias).toHaveLength(1);
+  it('importar pide confirmación; al confirmar guarda la copia, reemplaza los datos y se puede deshacer', async () => {
+    const storage = storageFalso();
+    const { usuario, guardado } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] }, storage);
+    const guardadoAntes = storage.getItem(CLAVE);
+
+    await subir(usuario, archivoJson(respaldoQuimica, 'respaldo.json'));
+
+    const dialogo = await screen.findByRole('dialog', { name: '¿Importar "respaldo.json"?' });
+    expect(dialogo).toHaveAccessibleDescription('Importar reemplazará tus datos actuales. Antes se guardará una copia de respaldo.');
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    const importar = within(dialogo).getByRole('button', { name: 'Importar' });
+    expect(importar).toHaveClass('bg-acento'); // Botón principal, no de peligro.
+    expect(importar).not.toHaveClass('bg-peligro-suave');
+    expect(guardado().materias.map((m) => m.nombre)).toEqual(['Física']);
+
+    await usuario.click(importar);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(seccion('Mis materias')).getByText('Química')).toBeInTheDocument();
+    expect(guardado().materias.map((m) => m.nombre)).toEqual(['Química']);
+    expect(storage.getItem(CLAVE_COPIA_IMPORTACION)).toBe(guardadoAntes);
+    expect(screen.getByRole('status')).toHaveTextContent('Datos importados');
 
     await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
-    expect(within(seccion('Mis materias')).queryByText('Física')).not.toBeInTheDocument();
+    expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
+    expect(within(seccion('Mis materias')).queryByText('Química')).not.toBeInTheDocument();
   });
 
-  it('un archivo que no es un respaldo muestra un error en la tarjeta y no cambia nada', async () => {
+  it('Cancelar la confirmación no cambia nada', async () => {
+    const storage = storageFalso();
+    const { usuario } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] }, storage);
+    const antes = new Map(storage.valores);
+
+    await subir(usuario, archivoJson(respaldoQuimica));
+    await usuario.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
+    expect(within(seccion('Mis materias')).queryByText('Química')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(storage.valores).toEqual(antes);
+  });
+
+  it('si no había datos guardados, importa sin crear la copia', async () => {
+    const storage = storageFalso();
+    const { usuario, guardado } = montar(undefined, storage);
+
+    await subir(usuario, archivoJson(respaldoQuimica));
+    await usuario.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Importar' }));
+
+    expect(guardado().materias.map((m) => m.nombre)).toEqual(['Química']);
+    expect(storage.valores.has(CLAVE_COPIA_IMPORTACION)).toBe(false);
+  });
+
+  it('si no se puede guardar la copia, no importa nada y lo dice en la tarjeta', async () => {
+    const base = storageFalso();
+    const storage: AlmacenWeb = {
+      getItem: base.getItem,
+      setItem: (clave, valor) => {
+        if (clave === CLAVE_COPIA_IMPORTACION) throw new DOMException('Simulado en la prueba', 'QuotaExceededError');
+        base.setItem(clave, valor);
+      },
+    };
+    const { usuario } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] }, storage);
+    const guardadoAntes = base.getItem(CLAVE);
+
+    await subir(usuario, archivoJson(respaldoQuimica));
+    await usuario.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Importar' }));
+
+    expect(within(seccion('Respaldo')).getByRole('alert')).toHaveTextContent(
+      'No se pudo guardar la copia de respaldo; no se importó nada.',
+    );
+    expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
+    expect(base.getItem(CLAVE)).toBe(guardadoAntes);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('un archivo que no es un respaldo muestra el motivo en la tarjeta, sin pedir confirmación ni cambiar nada', async () => {
     const { usuario, guardado } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] });
     const respaldo = seccion('Respaldo');
-    const archivo = (texto: string) => new File([texto], 'mi-u.json', { type: 'application/json' });
 
-    await usuario.upload(screen.getByLabelText('Archivo de respaldo'), archivo('{"notas": []}'));
-
-    expect(await within(respaldo).findByRole('alert')).toHaveTextContent('Ese archivo no es un respaldo válido de Mi U.');
+    for (const [texto, motivo] of [
+      ['{"notas": []}', 'Falta el campo "materias".'],
+      ['{"materias": [', 'El archivo no es JSON válido.'],
+      [respaldoQuimica.replace('"version":1', '"version":2'), 'Este respaldo es de una versión más nueva de Mi U.'],
+    ]) {
+      await subir(usuario, archivoJson(texto));
+      expect(await within(respaldo).findByRole('alert')).toHaveTextContent(motivo);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    }
     expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
     expect(guardado().materias.map((m) => m.nombre)).toEqual(['Física']);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
-    await usuario.upload(
-      screen.getByLabelText('Archivo de respaldo'),
-      archivo(JSON.stringify({ materias: [materia('m9', 'Química')], entregas: [], drive: [] })),
-    );
-    expect(await within(seccion('Mis materias')).findByText('Química')).toBeInTheDocument();
+    // Al elegir un respaldo válido, el mensaje se va.
+    await subir(usuario, archivoJson(respaldoQuimica));
+    await screen.findByRole('dialog');
     expect(within(respaldo).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('exportar descarga un JSON con la versión y la fecha de Bogotá, y su nombre lleva el día de Bogotá', async () => {
+    vi.setSystemTime(new Date('2026-10-14T20:30:00-05:00')); // En Tokio ya es el 15.
+    const { usuario } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] });
+    const archivos: Blob[] = [];
+    const nombres: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      nombres.push(this.download);
+    });
+    // jsdom no implementa los enlaces a Blob.
+    const original = { createObjectURL: URL.createObjectURL, revokeObjectURL: URL.revokeObjectURL };
+    Object.assign(URL, {
+      createObjectURL: (archivo: Blob) => {
+        archivos.push(archivo);
+        return 'blob:mi-u';
+      },
+      revokeObjectURL: () => {},
+    });
+    try {
+      await usuario.click(screen.getByRole('button', { name: 'Exportar datos' }));
+    } finally {
+      Object.assign(URL, original);
+    }
+
+    expect(nombres).toEqual(['mi-u-2026-10-14.json']);
+    expect(JSON.parse(await archivos[0].text())).toMatchObject({
+      version: 1,
+      fechaExportacion: '2026-10-14T20:30:00-05:00',
+      materias: [{ id: 'm1', nombre: 'Física' }],
+    });
   });
 });
 

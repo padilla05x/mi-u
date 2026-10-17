@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { botonPeligro, botonSecundario } from './estilos.ts';
+import { botonPeligro, botonPrincipal, botonSecundario } from './estilos.ts';
 
 interface Props {
   titulo: string;
@@ -9,6 +9,8 @@ interface Props {
   /** Texto del botón que confirma, por ejemplo "Quitar materia". */
   accion: string;
   iconoAccion?: LucideIcon;
+  /** Peligro para lo que borra (por defecto); principal para lo que tiene vuelta atrás, como Importar. */
+  estiloAccion?: 'peligro' | 'principal';
   onConfirmar: () => void;
   /** Al pulsar "Cancelar" o Esc. */
   onCancelar: () => void;
@@ -18,11 +20,15 @@ interface Props {
 
 const ENFOCABLES = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
+const ESTILOS_ACCION = { peligro: botonPeligro, principal: botonPrincipal };
+
 /**
- * Diálogo modal para confirmar una acción que borra. El foco empieza en "Cancelar" y no sale del diálogo; el resto
- * de la página queda inerte. Al cerrarse, el foco vuelve a donde estaba al abrirlo.
+ * Diálogo modal para confirmar una acción, como quitar una materia o importar un respaldo. El foco empieza en
+ * "Cancelar" y no sale del diálogo; el resto de la página queda inerte. Al cerrarse, el foco vuelve a donde estaba
+ * al abrirlo.
  */
-export default function Dialogo({ titulo, children, accion, iconoAccion: Icono, onConfirmar, onCancelar, focoSinOrigen }: Props) {
+export default function Dialogo(props: Props) {
+  const { titulo, children, accion, iconoAccion: Icono, estiloAccion = 'peligro', onConfirmar, onCancelar, focoSinOrigen } = props;
   const idTitulo = useId();
   const idTexto = useId();
   const capa = useRef<HTMLDivElement>(null);
@@ -85,7 +91,7 @@ export default function Dialogo({ titulo, children, accion, iconoAccion: Icono, 
           <button ref={cancelar} type="button" className={botonSecundario} onClick={onCancelar}>
             Cancelar
           </button>
-          <button type="button" className={botonPeligro} onClick={onConfirmar}>
+          <button type="button" className={ESTILOS_ACCION[estiloAccion]} onClick={onConfirmar}>
             {Icono && <Icono size={16} aria-hidden="true" />}
             {accion}
           </button>

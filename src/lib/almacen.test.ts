@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { storageFalso } from '../test/storage-falso.ts';
-import { abrirAlmacen, CLAVE, CLAVE_CORRUPTO, type AlmacenWeb } from './almacen.ts';
+import { abrirAlmacen, CLAVE, CLAVE_COPIA_IMPORTACION, CLAVE_CORRUPTO, type AlmacenWeb } from './almacen.ts';
 import { COLORES_MATERIA } from './colores.ts';
 import type { Datos, Materia } from './tipos.ts';
 
@@ -144,6 +144,54 @@ describe('abrirAlmacen', () => {
 
     expect(almacen.aviso).toBeNull();
     expect(almacen.guardar(datosNuevos)).toMatch(/está lleno/);
+  });
+});
+
+describe('copia antes de importar', () => {
+  it('copia tal cual lo guardado en mi-u-v1-respaldo-importacion, y la siguiente la reemplaza', () => {
+    const storage = storageFalso({ [CLAVE]: '{"guardado": 1}' });
+    const almacen = abrirAlmacen(storage);
+    expect(CLAVE_COPIA_IMPORTACION).toBe('mi-u-v1-respaldo-importacion');
+
+    expect(almacen.copiarAntesDeImportar()).toBe(true);
+    expect(storage.valores.get(CLAVE_COPIA_IMPORTACION)).toBe('{"guardado": 1}');
+
+    storage.setItem(CLAVE, '{"guardado": 2}');
+    expect(almacen.copiarAntesDeImportar()).toBe(true);
+    expect(storage.valores.get(CLAVE_COPIA_IMPORTACION)).toBe('{"guardado": 2}');
+  });
+
+  it('si no había datos guardados, no crea la copia', () => {
+    const storage = storageFalso();
+    expect(abrirAlmacen(storage).copiarAntesDeImportar()).toBe(true);
+    expect(storage.valores.has(CLAVE_COPIA_IMPORTACION)).toBe(false);
+  });
+
+  it('devuelve false si no puede escribir la copia o leer lo guardado', () => {
+    const base = storageFalso({ [CLAVE]: JSON.stringify(datosNuevos) });
+    const sinEspacio = abrirAlmacen({
+      ...base,
+      setItem: (clave: string, valor: string) => {
+        if (clave === CLAVE_COPIA_IMPORTACION) throw new DOMException('Simulado en la prueba', 'QuotaExceededError');
+        base.setItem(clave, valor);
+      },
+    });
+    expect(sinEspacio.copiarAntesDeImportar()).toBe(false);
+    expect(base.valores.has(CLAVE_COPIA_IMPORTACION)).toBe(false);
+
+    let lecturas = 0;
+    const lecturaFalla = abrirAlmacen({
+      ...base,
+      getItem: (clave: string) => {
+        if (++lecturas > 1) throw new DOMException('Simulado en la prueba', 'SecurityError');
+        return base.getItem(clave);
+      },
+    });
+    expect(lecturaFalla.copiarAntesDeImportar()).toBe(false);
+  });
+
+  it('sin localStorage no hay copia posible', () => {
+    expect(abrirAlmacen(null).copiarAntesDeImportar()).toBe(false);
   });
 });
 
