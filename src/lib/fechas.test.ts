@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   aIsoBogota,
   desdeCampoFecha,
+  diaDeSemanaEnBogota,
   diaEnBogota,
   esIsoBogota,
   formatoEncabezado,
@@ -9,6 +10,7 @@ import {
   formatoFechaEntrega,
   formatoHora,
   formatoSemana,
+  horaEnBogota,
   saludo,
 } from './fechas.ts';
 
@@ -103,5 +105,19 @@ describe('formatos de la vista semanal', () => {
 
   it('la hora de una entrega sale en hora de Bogotá', () => {
     expect(formatoHora('2026-10-14T23:59:00-05:00')).toMatch(/^11:59\sp\.\sm\.$/);
+  });
+});
+
+describe('diaDeSemanaEnBogota y horaEnBogota', () => {
+  it('dan el día (0 = lunes) y la hora de Bogotá aunque el sistema esté en Tokio', () => {
+    // Domingo 18 de octubre, 23:59 en Bogotá: en Tokio ya es lunes 19 a las 13:59.
+    const domingoNoche = Date.parse('2026-10-18T23:59:00-05:00');
+    expect([new Date(domingoNoche).getDay(), new Date(domingoNoche).getHours()]).toEqual([1, 13]);
+    expect(diaDeSemanaEnBogota(domingoNoche)).toBe(6);
+    expect(horaEnBogota(domingoNoche)).toBe('23:59');
+
+    const lunes = Date.parse('2026-10-19T00:00:00-05:00');
+    expect(diaDeSemanaEnBogota(lunes)).toBe(0);
+    expect(horaEnBogota(lunes)).toBe('00:00');
   });
 });

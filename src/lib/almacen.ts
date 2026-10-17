@@ -166,7 +166,14 @@ export function validarDatos(valor: unknown, { estricto = false }: OpcionesValid
     motivoLista(valor.materias, 'materias', (materia, n) => motivoMateria(materia, n, estricto)) ??
     motivoLista(entregas, 'entregas', motivoEntrega) ??
     motivoLista(valor.drive, 'drive', motivoDriveLink) ??
-    motivoLista(horario, 'horario', (bloque, n) => motivoBloque(bloque, n, valor.materias as MateriaGuardada[], estricto));
+    motivoLista(horario, 'horario', (bloque, n) =>
+      motivoBloque(bloque, {
+        quien: `el bloque ${n}`,
+        materias: valor.materias as MateriaGuardada[],
+        dondeMateria: estricto ? 'el archivo' : null,
+        conId: true,
+      }),
+    );
   if (motivo) return { ok: false, motivo };
   // Las cuatro listas ya pasaron sus reglas.
   const materias = (valor.materias as MateriaGuardada[]).map(migrarMateria);
@@ -304,11 +311,26 @@ function motivoDriveLink(valor: unknown, n: number): Motivo {
 const esHora = (valor: unknown) => typeof valor === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
 const esDiaSemana = (valor: unknown): valor is DiaSemana => Number.isInteger(valor) && (valor as number) >= 0 && (valor as number) <= 6;
 
-function motivoBloque(valor: unknown, n: number, materias: MateriaGuardada[], estricto: boolean): Motivo {
+export interface ReglasBloque {
+  /** Cómo se nombra en el motivo: "el bloque 2" en una lista, "el bloque" en el formulario. */
+  quien: string;
+  materias: readonly { id: string; nombre: string }[];
+  /** Dónde debe estar su materia ("el archivo"), para el motivo si no existe; null si no se exige. */
+  dondeMateria: string | null;
+  /** Exigir el id: los bloques guardados lo tienen; uno nuevo del formulario todavía no. */
+  conId: boolean;
+}
+
+/**
+ * Reglas de un bloque del horario, compartidas por validarDatos y por el formulario (validarBloque en horario.ts):
+ * materia de texto, día de 0 a 6, horas HH:MM, fin después de inicio y, si se pide, una materia que exista.
+ * Devuelve el motivo del primer problema, o null. Los solapes no son de un bloque solo: los revisa validarBloque.
+ */
+export function motivoBloque(valor: unknown, { quien: base, materias, dondeMateria, conId }: ReglasBloque): string | null {
   const materia = esObjeto(valor) ? materias.find((m) => m.id === valor.materiaId) : undefined;
-  const quien = `el bloque ${n}${materia ? ` ("${materia.nombre}")` : ''}`;
+  const quien = `${base}${materia ? ` ("${materia.nombre}")` : ''}`;
   const motivo = motivoCampos(valor, quien, [
-    [['id', 'materiaId'], esTexto, 'no es texto'],
+    [conId ? ['id', 'materiaId'] : ['materiaId'], esTexto, 'no es texto'],
     [['dia'], esDiaSemana, 'no es un día de 0 (lunes) a 6 (domingo)'],
     [['inicio', 'fin'], esHora, 'no es una hora HH:MM de 00:00 a 23:59, como 08:00'],
   ]);
@@ -316,6 +338,6 @@ function motivoBloque(valor: unknown, n: number, materias: MateriaGuardada[], es
   const { inicio, fin, materiaId } = valor as Bloque;
   // Con el formato HH:MM, comparar el texto compara las horas.
   if (fin <= inicio) return `${conMayuscula(quien)} debe terminar después de empezar: va de ${inicio} a ${fin}.`;
-  if (estricto && !materia) return `${conMayuscula(quien)} es de una materia que no está en el archivo ("${materiaId}").`;
+  if (dondeMateria !== null && !materia) return `${conMayuscula(quien)} es de una materia que no está en ${dondeMateria} ("${materiaId}").`;
   return null;
 }

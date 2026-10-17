@@ -1,3 +1,5 @@
+import type { DiaSemana } from './tipos.ts';
+
 // Bogotá está en UTC−5 todo el año (no tiene horario de verano), así que la app
 // usa ese desfase fijo para todas las fechas, sin importar la zona del equipo.
 const DESFASE = '-05:00';
@@ -18,6 +20,16 @@ export function esIsoBogota(valor: unknown): valor is string {
   // siguiente), así que solo vale si al volver a escribirla queda igual.
   const instante = Date.parse(valor);
   return !Number.isNaN(instante) && aIsoBogota(instante) === valor;
+}
+
+/** Día de la semana en Bogotá del instante: 0 = lunes … 6 = domingo, como en el horario. */
+export function diaDeSemanaEnBogota(instante: number): DiaSemana {
+  return ((new Date(instante + DESFASE_MS).getUTCDay() + 6) % 7) as DiaSemana;
+}
+
+/** Hora y minuto en Bogotá del instante: "HH:MM" de 24 horas. */
+export function horaEnBogota(instante: number): string {
+  return aIsoBogota(instante).slice(11, 16);
 }
 
 /** Fecha de calendario en Bogotá ("AAAA-MM-DD") del instante dado; sin argumento, la de hoy. */
