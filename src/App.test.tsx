@@ -82,15 +82,31 @@ describe('Entregas', () => {
     expect(guardado().entregas).toEqual([]);
   });
 
-  it('pide completar materia, descripción y fecha', async () => {
-    const alerta = vi.spyOn(window, 'alert').mockImplementation(() => {});
-    const { usuario } = montar();
+  it('sin descripción o fecha muestra un error bajo el formulario y no agrega nada', async () => {
+    const storage = storageFalso();
+    const { usuario } = montar(undefined, storage);
+    const entregas = seccion('Entregas');
+    const agregar = within(entregas).getByRole('button', { name: 'Agregar' });
 
-    await usuario.type(screen.getByLabelText('Descripción'), 'Taller 3');
-    await usuario.click(within(seccion('Entregas')).getByRole('button', { name: 'Agregar' }));
+    await usuario.click(agregar);
+    const error = within(entregas).getByRole('alert');
+    expect(error).toHaveTextContent('Completa materia, descripción y fecha.');
 
-    expect(alerta).toHaveBeenCalledWith('Completa materia, descripción y fecha.');
+    // Al reenviar sin corregir, el mensaje se crea de nuevo para que el lector de pantalla lo repita.
+    await usuario.click(agregar);
+    expect(within(entregas).getByRole('alert')).not.toBe(error);
+
+    await usuario.type(within(entregas).getByLabelText('Descripción'), 'Taller 3');
+    expect(within(entregas).queryByRole('alert')).not.toBeInTheDocument();
+    await usuario.click(agregar);
+    expect(within(entregas).getByRole('alert')).toHaveTextContent('Completa materia, descripción y fecha.');
     expect(filasEntregas()).toHaveLength(0);
+    expect(storage.valores.has(CLAVE)).toBe(false);
+
+    fireEvent.change(within(entregas).getByLabelText('Fecha límite'), { target: { value: '2026-10-20T20:00' } });
+    expect(within(entregas).queryByRole('alert')).not.toBeInTheDocument();
+    await usuario.click(agregar);
+    expect(filasEntregas()).toHaveLength(1);
   });
 
   it('marcarla como hecha la deja "Entregada" y la pasa al final', async () => {
@@ -134,8 +150,7 @@ describe('Mis materias', () => {
     expect(guardado().materias.at(-1)).toMatchObject({ nombre: 'Cálculo Integral', clase: '', moodle: '', classroom: '' });
   });
 
-  it('quitar una materia pide confirmación y borra también sus enlaces y entregas', async () => {
-    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('quitar una materia pide confirmación en un diálogo y borra también sus enlaces y entregas', async () => {
     const { usuario, guardado } = montar({
       materias: [materia('m1', 'Ingeniería de Software', { clase: 'meet.google.com/abc' }), materia('m2', 'Estructura de Datos')],
       entregas: [
@@ -147,21 +162,67 @@ describe('Mis materias', () => {
 
     await usuario.click(within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Ingeniería de Software' }));
 
-    expect(confirmar).toHaveBeenCalledWith('¿Quitar "Ingeniería de Software"? También se borran sus links y entregas.');
+    const dialogo = screen.getByRole('dialog', { name: '¿Quitar "Ingeniería de Software"?' });
+    expect(dialogo).toHaveAttribute('aria-modal', 'true');
+    expect(dialogo).toHaveAccessibleDescription('También se borran sus enlaces y entregas. Después podrás deshacerlo.');
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    expect(guardado().materias).toHaveLength(2);
+
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Quitar materia' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByText('Ingeniería de Software')).not.toBeInTheDocument();
+    expect(within(seccion('Clases virtuales')).queryByLabelText('Enlace de Ingeniería de Software')).not.toBeInTheDocument();
     expect(filasEntregas().map((f) => within(f).getByRole('checkbox').getAttribute('aria-label'))).toEqual([
       'Parcial',
     ]);
     expect(guardado()).toMatchObject({ materias: [{ id: 'm2' }], entregas: [{ id: 'e2' }] });
+    // Su botón ya no existe: el foco pasa a "Deshacer", que la devuelve.
+    expect(screen.getByRole('status')).toHaveTextContent('Materia quitada');
+    expect(screen.getByRole('button', { name: 'Deshacer' })).toHaveFocus();
   });
 
-  it('si se cancela la confirmación no quita nada', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('Cancelar cierra el diálogo sin quitar nada y devuelve el foco al botón que lo abrió', async () => {
     const storage = storageFalso();
     const { usuario } = montar(undefined, storage);
+    const quitar = within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Ingeniería de Software' });
 
-    await usuario.click(within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Ingeniería de Software' }));
+    await usuario.click(quitar);
+    await usuario.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancelar' }));
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(within(seccion('Mis materias')).getByText('Ingeniería de Software')).toBeInTheDocument();
+    expect(storage.valores.has(CLAVE)).toBe(false);
+    expect(quitar).toHaveFocus();
+  });
+
+  it('con teclado: el foco no sale del diálogo, los atajos no actúan y Esc lo cierra sin quitar nada', async () => {
+    const storage = storageFalso();
+    const { usuario, vista } = montar(undefined, storage);
+    const quitar = within(seccion('Mis materias')).getByRole('button', { name: 'Quitar Ingeniería de Software' });
+    quitar.focus();
+    await usuario.keyboard('{Enter}');
+
+    const dialogo = screen.getByRole('dialog');
+    const cancelar = within(dialogo).getByRole('button', { name: 'Cancelar' });
+    const confirmar = within(dialogo).getByRole('button', { name: 'Quitar materia' });
+    expect(cancelar).toHaveFocus();
+    expect(vista.container).toHaveAttribute('inert'); // El resto de la página no se puede usar.
+
+    await usuario.tab();
+    expect(confirmar).toHaveFocus();
+    await usuario.tab();
+    expect(cancelar).toHaveFocus();
+    await usuario.tab({ shift: true });
+    expect(confirmar).toHaveFocus();
+    await usuario.keyboard('n');
+    expect(confirmar).toHaveFocus();
+
+    await usuario.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(vista.container).not.toHaveAttribute('inert');
+    expect(quitar).toHaveFocus();
     expect(within(seccion('Mis materias')).getByText('Ingeniería de Software')).toBeInTheDocument();
     expect(storage.valores.has(CLAVE)).toBe(false);
   });
@@ -224,6 +285,29 @@ describe('Drive', () => {
     await usuario.click(within(drive).getByRole('button', { name: 'Quitar Carpeta de PETI' }));
     expect(filas(drive)).toHaveLength(0);
     expect(guardado().drive).toEqual([]);
+  });
+
+  it('sin nombre o enlace muestra un error bajo el formulario y no guarda nada', async () => {
+    const storage = storageFalso();
+    const { usuario } = montar(undefined, storage);
+    const drive = seccion('Drive');
+    const guardar = within(drive).getByRole('button', { name: 'Guardar' });
+
+    await usuario.click(guardar);
+    expect(within(drive).getByRole('alert')).toHaveTextContent('Escribe un nombre y un enlace.');
+
+    await usuario.type(within(drive).getByLabelText('Nombre'), 'Carpeta de PETI');
+    expect(within(drive).queryByRole('alert')).not.toBeInTheDocument();
+    await usuario.type(within(drive).getByLabelText('Enlace'), '   ');
+    await usuario.click(guardar);
+    expect(within(drive).getByRole('alert')).toHaveTextContent('Escribe un nombre y un enlace.');
+    expect(filas(drive)).toHaveLength(0);
+    expect(storage.valores.has(CLAVE)).toBe(false);
+
+    await usuario.type(within(drive).getByLabelText('Enlace'), 'drive.google.com');
+    expect(within(drive).queryByRole('alert')).not.toBeInTheDocument();
+    await usuario.click(guardar);
+    expect(filas(drive)).toHaveLength(1);
   });
 });
 
@@ -309,6 +393,39 @@ describe('Avisos del navegador', () => {
 
     act(() => vi.advanceTimersByTime(10 * 60_000));
     expect(creadas).toHaveLength(2);
+  });
+
+  it('marcar entregas como avisadas no quita el Deshacer pendiente, y deshacer no repite el aviso', async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ now: AHORA, toFake: ['Date', 'setInterval', 'clearInterval'] });
+    const creadas = simularNotificaciones('granted');
+    const { usuario, guardado } = montar({
+      materias: [materia('m1', 'Física')],
+      entregas: [
+        entrega('e1', 'm1', 'Parcial', '2026-10-15T10:00:00-05:00'),
+        entrega('e2', 'm1', 'Informe', '2026-10-20T20:00:00-05:00'),
+      ],
+      drive: [],
+    });
+
+    await usuario.click(screen.getByRole('button', { name: 'Borrar Informe' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Entrega borrada');
+
+    // A las 10:00 el Parcial entra en la ventana de 24 h y la app lo marca como avisado.
+    act(() => vi.advanceTimersByTime(60 * 60_000));
+    expect(creadas.map((a) => a.cuerpo)).toEqual(['Parcial · Física']);
+    expect(guardado().entregas).toMatchObject([{ id: 'e1', avisada: true }]);
+    expect(screen.getByRole('status')).toHaveTextContent('Entrega borrada');
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
+
+    expect(filasEntregas().map((f) => within(f).getByRole('checkbox').getAttribute('aria-label'))).toEqual([
+      'Parcial',
+      'Informe',
+    ]);
+    expect(guardado().entregas.map((e) => e.avisada)).toEqual([true, false]);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(creadas).toHaveLength(1);
   });
 
   it('al desmontar no deja intervalos activos', () => {
@@ -532,6 +649,23 @@ describe('Deshacer y respaldo', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('un cambio de la persona sí quita el Deshacer pendiente', async () => {
+    const { usuario } = montar({
+      materias: [materia('m1', 'Física')],
+      entregas: [
+        entrega('e1', 'm1', 'Parcial', '2026-10-15T10:00:00-05:00'),
+        entrega('e2', 'm1', 'Informe', '2026-10-20T20:00:00-05:00'),
+      ],
+      drive: [],
+    });
+
+    await usuario.click(screen.getByRole('button', { name: 'Borrar Informe' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Entrega borrada');
+    await usuario.click(screen.getByRole('checkbox', { name: 'Parcial' }));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('importar un respaldo reemplaza los datos y se puede deshacer', async () => {
     const { usuario, guardado } = montar({ materias: [], entregas: [], drive: [] });
     const respaldo = JSON.stringify({
@@ -549,6 +683,26 @@ describe('Deshacer y respaldo', () => {
 
     await usuario.click(screen.getByRole('button', { name: 'Deshacer' }));
     expect(within(seccion('Mis materias')).queryByText('Física')).not.toBeInTheDocument();
+  });
+
+  it('un archivo que no es un respaldo muestra un error en la tarjeta y no cambia nada', async () => {
+    const { usuario, guardado } = montar({ materias: [materia('m1', 'Física')], entregas: [], drive: [] });
+    const respaldo = seccion('Respaldo');
+    const archivo = (texto: string) => new File([texto], 'mi-u.json', { type: 'application/json' });
+
+    await usuario.upload(screen.getByLabelText('Archivo de respaldo'), archivo('{"notas": []}'));
+
+    expect(await within(respaldo).findByRole('alert')).toHaveTextContent('Ese archivo no es un respaldo válido de Mi U.');
+    expect(within(seccion('Mis materias')).getByText('Física')).toBeInTheDocument();
+    expect(guardado().materias.map((m) => m.nombre)).toEqual(['Física']);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    await usuario.upload(
+      screen.getByLabelText('Archivo de respaldo'),
+      archivo(JSON.stringify({ materias: [materia('m9', 'Química')], entregas: [], drive: [] })),
+    );
+    expect(await within(seccion('Mis materias')).findByText('Química')).toBeInTheDocument();
+    expect(within(respaldo).queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 

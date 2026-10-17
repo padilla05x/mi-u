@@ -64,7 +64,7 @@ function colorReal(modo: Modo, token: string): string {
 
 describe('docs/diseno.md frente a src/index.css', () => {
   it('el documento tiene las tablas que revisa esta prueba', () => {
-    expect(paleta).toHaveLength(24);
+    expect(paleta).toHaveLength(26);
     expect(pares.length).toBeGreaterThanOrEqual(20);
     expect(materias).toHaveLength(8);
   });

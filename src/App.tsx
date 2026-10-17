@@ -34,7 +34,10 @@ export default function App({ store }: { store: Store }) {
   const ahora = useAhora();
   useAtajos();
   const nombreDe = (id: string) => nombreMateria(datos.materias, id);
-  const avisosNavegador = useAvisos(datos.entregas, nombreDe, (ids) => store.actualizar((d) => marcarAvisadas(d, ids)));
+  // Marcar avisos es un cambio interno: no debe borrar el aviso de Deshacer de un cambio de la persona.
+  const avisosNavegador = useAvisos(datos.entregas, nombreDe, (ids) =>
+    store.actualizarSinDeshacer((d) => marcarAvisadas(d, ids)),
+  );
   const guardarEnlaceDe = (id: string, campo: CampoEnlace, url: string) =>
     store.actualizar((d) => guardarEnlace(d, id, campo, url));
 
@@ -93,7 +96,7 @@ export default function App({ store }: { store: Store }) {
         >
           {deshacer}
           <span className="flex gap-2">
-            <button type="button" className={botonSecundario} onClick={store.deshacer}>
+            <button id="boton-deshacer" type="button" className={botonSecundario} onClick={store.deshacer}>
               Deshacer
             </button>
             <button type="button" className={botonIcono} aria-label="Cerrar aviso" onClick={store.descartarDeshacer}>

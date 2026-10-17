@@ -14,8 +14,16 @@ export interface EstadoStore {
 export interface Store {
   obtener(): EstadoStore;
   suscribir(oyente: () => void): () => void;
-  /** Aplica el cambio, lo guarda y avisa a la interfaz. Con `deshacible` (el mensaje) el cambio se puede revertir. */
+  /**
+   * Cambio de la persona: lo aplica, lo guarda y avisa a la interfaz. Con `deshacible` (el mensaje) se puede
+   * revertir; sin él, descarta cualquier Deshacer pendiente.
+   */
   actualizar(cambio: (datos: Datos) => Datos, deshacible?: string): void;
+  /**
+   * Cambio interno de la app, como marcar avisos: no crea ni descarta el Deshacer pendiente. También se aplica
+   * a los datos que restauraría Deshacer, para que deshacer un borrado no pierda este cambio.
+   */
+  actualizarSinDeshacer(cambio: (datos: Datos) => Datos): void;
   /** Devuelve los datos a antes del último cambio deshacible. */
   deshacer(): void;
   /** Quita la opción de deshacer sin revertir nada. */
@@ -49,6 +57,10 @@ export function crearStore(almacen: Almacen): Store {
     actualizar(cambio, deshacible) {
       previo = deshacible ? estado.datos : null;
       aplicar(cambio(estado.datos), deshacible ?? null);
+    },
+    actualizarSinDeshacer(cambio) {
+      if (previo) previo = cambio(previo);
+      aplicar(cambio(estado.datos), estado.deshacer);
     },
     deshacer() {
       if (previo) aplicar(previo, null);

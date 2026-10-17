@@ -1,10 +1,12 @@
 import { ExternalLink, FolderOpen, FolderPlus, Plus, Trash } from 'lucide-react';
 import { useState } from 'react';
+import { useErrorFormulario } from '../hooks/useErrorFormulario.ts';
 import { abrirEnlace } from '../lib/enlaces.ts';
 import type { DriveLink } from '../lib/tipos.ts';
 import Campo from './Campo.tsx';
 import EstadoVacio from './EstadoVacio.tsx';
 import { botonIcono, botonPrincipal, botonSecundario, campo, fila, tituloElemento } from './estilos.ts';
+import MensajeError from './MensajeError.tsx';
 import Tarjeta from './Tarjeta.tsx';
 
 interface Props {
@@ -17,14 +19,16 @@ interface Props {
 export default function Drive({ enlaces, onAgregar, onQuitar, className }: Props) {
   const [nombre, setNombre] = useState('');
   const [url, setUrl] = useState('');
+  const { error, mostrar: mostrarError, limpiar: limpiarError } = useErrorFormulario();
 
   const guardar = () => {
     const nombreLimpio = nombre.trim();
     const urlLimpia = url.trim();
     if (!nombreLimpio || !urlLimpia) {
-      window.alert('Escribe un nombre y un enlace.');
+      mostrarError('Escribe un nombre y un enlace.');
       return;
     }
+    limpiarError();
     onAgregar(nombreLimpio, urlLimpia);
     setNombre('');
     setUrl('');
@@ -89,7 +93,10 @@ export default function Drive({ enlaces, onAgregar, onQuitar, className }: Props
             className={campo}
             placeholder="Ej. Carpeta de PETI"
             value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
+            onChange={(e) => {
+              setNombre(e.target.value);
+              limpiarError();
+            }}
           />
         </Campo>
         <Campo id="drive-enlace" etiqueta="Enlace">
@@ -99,7 +106,10 @@ export default function Drive({ enlaces, onAgregar, onQuitar, className }: Props
             className={campo}
             placeholder="Pega el enlace"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              limpiarError();
+            }}
           />
         </Campo>
         <button type="button" className={botonPrincipal} onClick={guardar}>
@@ -107,6 +117,7 @@ export default function Drive({ enlaces, onAgregar, onQuitar, className }: Props
           Guardar
         </button>
       </div>
+      <MensajeError error={error} className="mt-3" />
     </Tarjeta>
   );
 }

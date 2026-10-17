@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { storageFalso } from '../test/storage-falso.ts';
 import { abrirAlmacen, CLAVE } from './almacen.ts';
-import { agregarMateria } from './datos.ts';
+import { agregarMateria, borrarEntrega, marcarAvisadas } from './datos.ts';
 import { crearStore } from './store.ts';
 
 describe('crearStore', () => {
@@ -60,5 +60,42 @@ describe('crearStore', () => {
     expect(store.obtener().deshacer).toBeNull();
     store.deshacer();
     expect(store.obtener().datos.materias.map((m) => m.nombre)).toEqual(["Física"]);
+  });
+
+  it('marcar avisos no toca el Deshacer pendiente, y deshacer conserva esas marcas', () => {
+    const base = storageFalso();
+    base.setItem(
+      CLAVE,
+      JSON.stringify({
+        materias: [{ id: 'm1', nombre: 'Física', color: 'orquidea', clase: '', moodle: '', classroom: '' }],
+        entregas: [
+          { id: 'e1', materia: 'm1', texto: 'Taller', fecha: '2026-10-20T20:00:00-05:00', hecha: false, avisada: false },
+          { id: 'e2', materia: 'm1', texto: 'Quiz', fecha: '2026-10-21T20:00:00-05:00', hecha: false, avisada: false },
+        ],
+        drive: [],
+      }),
+    );
+    const store = crearStore(abrirAlmacen(base));
+
+    store.actualizar((datos) => borrarEntrega(datos, 'e1'), 'Entrega borrada');
+    store.actualizarSinDeshacer((datos) => marcarAvisadas(datos, ['e2']));
+
+    expect(store.obtener().deshacer).toBe('Entrega borrada');
+    expect(store.obtener().datos.entregas.map((e) => [e.id, e.avisada])).toEqual([['e2', true]]);
+
+    store.deshacer();
+    expect(store.obtener().deshacer).toBeNull();
+    expect(store.obtener().datos.entregas.map((e) => [e.id, e.avisada])).toEqual([
+      ['e1', false],
+      ['e2', true],
+    ]);
+  });
+
+  it('sin Deshacer pendiente, un cambio interno no crea uno', () => {
+    const store = crearStore(abrirAlmacen(storageFalso()));
+    store.actualizarSinDeshacer((datos) => agregarMateria(datos, 'Física'));
+    expect(store.obtener().deshacer).toBeNull();
+    store.deshacer();
+    expect(store.obtener().datos.materias.at(-1)?.nombre).toBe('Física');
   });
 });

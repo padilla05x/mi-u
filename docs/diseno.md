@@ -21,7 +21,7 @@ Sigo la dirección pedida, con estas precisiones:
 
 ## Paleta de la interfaz
 
-Los nombres de token son los de `src/index.css` (`--color-<token>`). Se conservan los siete de la versión actual (`fondo`, `tarjeta`, `texto`, `tenue`, `borde`, `acento`, `acento-suave`) y se reemplazan `exito`, `peligro` y `alerta` por tokens con el nombre de cada estado.
+Los nombres de token son los de `src/index.css` (`--color-<token>`). Se conservan los siete de la versión actual (`fondo`, `tarjeta`, `texto`, `tenue`, `borde`, `acento`, `acento-suave`) y se reemplazan `exito`, `peligro` y `alerta` por tokens con el nombre de cada estado. Después volvió `peligro`, con `peligro-suave`, para las acciones que borran y los mensajes de error.
 
 | Token | Uso | Claro | Oscuro |
 |---|---|---|---|
@@ -49,9 +49,12 @@ Los nombres de token son los de `src/index.css` (`--color-<token>`). Se conserva
 | `dias-fondo` | Fondo de "en N días" | `#EEF1F6` | `#212839` |
 | `aviso` | Icono del aviso del almacén | `#924A00` | `#F6C77E` |
 | `aviso-fondo` | Fondo del aviso del almacén | `#FFF1DB` | `#33250F` |
+| `peligro` | Texto del botón de peligro y de los mensajes de error | `#B42318` | `#FDA4A4` |
+| `peligro-suave` | Fondo del botón de peligro | `#FDECEA` | `#36161A` |
 
 - **El acento cambia en modo oscuro.** El índigo del modo claro (`#4F46E5`) queda en 2,7:1 sobre la tarjeta oscura, y un índigo claro con texto blanco no llega a 4,5:1. Por eso en oscuro el acento se aclara y el texto del botón principal pasa a índigo oscuro.
 - **El aviso usa los valores de "Para hoy".** Tiene tokens propios para poder cambiarlos por separado.
+- **Peligro usa los valores de "Vencida".** También tiene tokens propios, por la misma razón.
 
 ## Pares de contraste
 
@@ -83,6 +86,8 @@ Una prueba de `npm test` lee este documento y los tokens reales de `src/index.cs
 | en N días | `dias` | `dias-fondo` | 4,5 | 6,79 | 8,95 |
 | Aviso del almacén: icono | `aviso` | `aviso-fondo` | 4,5 | 5,89 | 9,48 |
 | Aviso del almacén: texto | `texto` | `aviso-fondo` | 4,5 | 14,58 | 12,47 |
+| Botón de peligro | `peligro` | `peligro-suave` | 4,5 | 5,75 | 8,57 |
+| Mensaje de error de un formulario | `peligro` | `tarjeta` | 4,5 | 6,57 | 9,12 |
 | Borde de campos | `borde-control` | `tarjeta` | 3 | 3,38 | 3,78 |
 | Anillo de foco | `foco` | `tarjeta` | 3 | 6,29 | 8,72 |
 | Anillo de foco | `foco` | `fondo` | 3 | 5,82 | 9,61 |
@@ -391,6 +396,17 @@ Es una franja a todo el ancho, encima de las tarjetas:
 - radio de 12 px.
 
 Conserva `role="alert"`, como ahora.
+
+### Diálogo de confirmación
+
+Se usa antes de quitar una materia, porque también borra sus enlaces y entregas.
+- **Aspecto.** Panel con el estilo de una tarjeta (fondo `tarjeta`, borde `borde`, radio de 16 px y su sombra), centrado sobre la página cubierta con `fondo` al 80 %.
+- **Contenido.** Título de 18 px, explicación en `tenue` y dos botones: "Cancelar" (secundario) y la acción, como "Quitar materia", en botón de peligro (`peligro` sobre `peligro-suave`).
+- **Teclado.** El foco empieza en "Cancelar", Tab no sale del diálogo y Esc lo cierra. Al cerrar, el foco vuelve al botón que lo abrió; si ese botón ya no existe, pasa a "Deshacer".
+
+### Mensajes de error
+
+Si falta un dato en un formulario (Entregas, Drive) o el archivo de respaldo no sirve, el mensaje aparece debajo, en la misma tarjeta: texto de 14 px en `peligro` con `role="alert"`. Se quita al cambiar un campo o al enviar bien.
 
 ## Pantallas de referencia
 

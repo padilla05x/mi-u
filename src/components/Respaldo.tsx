@@ -1,8 +1,10 @@
 import { Download, HardDriveDownload, Upload } from 'lucide-react';
 import { useRef } from 'react';
+import { useErrorFormulario } from '../hooks/useErrorFormulario.ts';
 import type { Datos } from '../lib/tipos.ts';
 import { exportar, importar } from '../lib/respaldo.ts';
 import { botonSecundario } from './estilos.ts';
+import MensajeError from './MensajeError.tsx';
 import Tarjeta from './Tarjeta.tsx';
 
 interface Props {
@@ -13,6 +15,7 @@ interface Props {
 
 export default function Respaldo({ datos, onImportar, className }: Props) {
   const entrada = useRef<HTMLInputElement>(null);
+  const { error, mostrar: mostrarError, limpiar: limpiarError } = useErrorFormulario();
 
   const descargar = () => {
     const url = URL.createObjectURL(new Blob([exportar(datos)], { type: 'application/json' }));
@@ -26,8 +29,10 @@ export default function Respaldo({ datos, onImportar, className }: Props) {
   const leer = async (archivo: File | undefined) => {
     if (!archivo) return;
     const nuevos = importar(await archivo.text());
-    if (nuevos) onImportar(nuevos);
-    else window.alert('Ese archivo no es un respaldo válido de Mi U.');
+    if (nuevos) {
+      limpiarError();
+      onImportar(nuevos);
+    } else mostrarError('Ese archivo no es un respaldo válido de Mi U.');
     if (entrada.current) entrada.current.value = '';
   };
 
@@ -56,6 +61,7 @@ export default function Respaldo({ datos, onImportar, className }: Props) {
           onChange={(e) => void leer(e.target.files?.[0])}
         />
       </div>
+      <MensajeError error={error} className="mt-3" />
     </Tarjeta>
   );
 }
