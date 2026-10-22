@@ -27,6 +27,7 @@ import {
   quitarDrive,
   quitarMateria,
 } from './lib/datos.ts';
+import { activarClaseAlterna, guardarClaseAlterna, quitarClaseAlterna } from './lib/clases.ts';
 import { resumenEntregas } from './lib/entregas.ts';
 import { agregarBloque, borrarBloque } from './lib/horario.ts';
 import { mostrarEnSeccion, quitarDeSeccion } from './lib/secciones.ts';
@@ -77,7 +78,16 @@ export default function App({ store }: { store: Store }) {
           onAlternar={(id) => store.actualizar((d) => alternarEntrega(d, id))}
           onBorrar={(id) => store.actualizar((d) => borrarEntrega(d, id), 'Entrega borrada')}
         />
-        <ClasesVirtuales className="lg:col-span-2" {...seccionEnlaces} />
+        <ClasesVirtuales
+          className="lg:col-span-2"
+          {...seccionEnlaces}
+          alterno={{
+            horario: datos.horario,
+            onActivar: (id) => store.actualizar((d) => activarClaseAlterna(d, id)),
+            onQuitar: (id) => store.actualizar((d) => quitarClaseAlterna(d, id)),
+            onGuardar: (id, campo, valor) => store.actualizar((d) => guardarClaseAlterna(d, id, campo, valor)),
+          }}
+        />
         <AulaMoodle className="lg:col-span-2" {...seccionEnlaces} />
         <Classroom className="lg:col-span-2" {...seccionEnlaces} />
         <Drive

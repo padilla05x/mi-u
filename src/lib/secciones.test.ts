@@ -10,6 +10,9 @@ const materia = (id: string, extra: Partial<Materia> = {}): Materia => ({
   clase: `https://meet.google.com/${id}`,
   moodle: `https://moodle.u.edu.co/${id}`,
   classroom: `https://classroom.google.com/${id}`,
+  tieneClaseAlterna: false,
+  claseAlterna: '',
+  claseAlternaNombre: '',
   ocultaEn: [],
   ...extra,
 });
@@ -78,6 +81,37 @@ describe('mostrarEnSeccion', () => {
   it('no hace nada si la materia no existe o no está oculta, y conserva su enlace', () => {
     expect(mostrarEnSeccion(datos, 'x', 'moodle')).toBe(datos);
     expect(mostrarEnSeccion(datos, 'a', 'moodle')).toBe(datos);
+  });
+});
+
+describe('quitarDeSeccion y el link alterno', () => {
+  const ecu = materia('ecu', { tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' });
+  const conAlterno: Datos = {
+    ...datos,
+    materias: [ecu, materia('b')],
+    horario: [
+      { id: 'b1', materiaId: 'ecu', dia: 0, inicio: '08:00', fin: '10:00', enlace: 'principal' },
+      { id: 'b2', materiaId: 'ecu', dia: 4, inicio: '08:00', fin: '10:00', enlace: 'alterno' },
+    ],
+  };
+
+  it('quitarla de Clases virtuales también borra su alterno, y los bloques que lo usaban pasan al principal', () => {
+    const nuevos = quitarDeSeccion(conAlterno, 'ecu', 'clase');
+    expect(nuevos.materias[0]).toEqual({ ...ecu, clase: '', tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '', ocultaEn: ['clase'] });
+    expect(nuevos.horario.map((b) => b.enlace)).toEqual(['principal', 'principal']);
+  });
+
+  it('quitarla de Moodle o de Classroom no toca el alterno ni los bloques', () => {
+    for (const seccion of ['moodle', 'classroom'] as const) {
+      const nuevos = quitarDeSeccion(conAlterno, 'ecu', seccion);
+      expect(nuevos.materias[0]).toMatchObject({ tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' });
+      expect(nuevos.horario).toBe(conAlterno.horario);
+    }
+  });
+
+  it('si ya estaba oculta en Clases virtuales, no cambia nada', () => {
+    const oculta: Datos = { ...conAlterno, materias: [{ ...ecu, ocultaEn: ['clase'] }] };
+    expect(quitarDeSeccion(oculta, 'ecu', 'clase')).toBe(oculta);
   });
 });
 

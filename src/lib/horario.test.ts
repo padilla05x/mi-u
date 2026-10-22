@@ -19,11 +19,29 @@ const materia = (id: string, nombre: string): Materia => ({
   clase: '',
   moodle: '',
   classroom: '',
+  tieneClaseAlterna: false,
+  claseAlterna: '',
+  claseAlternaNombre: '',
   ocultaEn: [],
 });
 const materias = [materia('fis', 'Física'), materia('qui', 'Química')];
-const bloque = (id: string, cambio: Partial<Bloque> = {}): Bloque => ({ id, materiaId: 'fis', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
-const nuevo = (cambio: Partial<BloqueNuevo> = {}): BloqueNuevo => ({ materiaId: 'fis', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
+const bloque = (id: string, cambio: Partial<Bloque> = {}): Bloque => ({
+  id,
+  materiaId: 'fis',
+  dia: 0,
+  inicio: '08:00',
+  fin: '10:00',
+  enlace: 'principal',
+  ...cambio,
+});
+const nuevo = (cambio: Partial<BloqueNuevo> = {}): BloqueNuevo => ({
+  materiaId: 'fis',
+  dia: 0,
+  inicio: '08:00',
+  fin: '10:00',
+  enlace: 'principal',
+  ...cambio,
+});
 const ids = (bloques: Bloque[]) => bloques.map((b) => b.id);
 
 // La semana del 12 al 18 de octubre de 2026 va de lunes a domingo. Las pruebas corren con TZ=Asia/Tokyo
@@ -89,6 +107,19 @@ describe('validarBloque', () => {
   ])('rechaza una hora mal formada (%s "%s")', (campo, hora) => {
     expect(validarBloque(nuevo({ [campo]: hora }), [], materias)).toBe(
       `El campo "${campo}" del bloque ("Física") no es una hora HH:MM de 00:00 a 23:59, como 08:00.`,
+    );
+  });
+
+  it('un bloque que usa el link alterno necesita una materia con alterno, aunque el link esté vacío', () => {
+    expect(validarBloque(nuevo({ enlace: 'alterno' }), [], materias)).toBe('El bloque ("Física") usa el link alterno, pero su materia no tiene uno.');
+    const conAlterno = [{ ...materias[0], tieneClaseAlterna: true }, materias[1]];
+    expect(validarBloque(nuevo({ enlace: 'alterno' }), [], conAlterno)).toBeNull();
+    expect(validarBloque(nuevo({ enlace: 'principal' }), [], materias)).toBeNull();
+  });
+
+  it('rechaza un enlace que no es "principal" ni "alterno"', () => {
+    expect(validarBloque(nuevo({ enlace: 'viernes' as Bloque['enlace'] }), [], materias)).toBe(
+      'El campo "enlace" del bloque ("Física") no es "principal" ni "alterno".',
     );
   });
 
@@ -198,7 +229,16 @@ describe('horarioPorDia y describirBloque', () => {
   });
 
   it('describe el bloque con la materia, el día y las horas', () => {
-    expect(describirBloque(bloque('b', { dia: 2, inicio: '08:00', fin: '10:00' }), 'Física')).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(describirBloque(bloque('b', { dia: 2, inicio: '08:00', fin: '10:00' }), materias[0])).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(describirBloque(bloque('b'), undefined)).toBe('Materia eliminada, lunes de 08:00 a 10:00');
+  });
+
+  it('si el bloque usa el link alterno, lo nombra; con el principal, igual que siempre', () => {
+    const ecu = { ...materia('ecu', 'Ecuaciones'), tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' };
+    const viernes = bloque('b', { materiaId: 'ecu', dia: 4, enlace: 'alterno' });
+    expect(describirBloque(viernes, ecu)).toBe('Ecuaciones, viernes de 08:00 a 10:00, link Viernes');
+    expect(describirBloque(viernes, { ...ecu, claseAlternaNombre: '' })).toBe('Ecuaciones, viernes de 08:00 a 10:00, link Alterno');
+    expect(describirBloque({ ...viernes, enlace: 'principal' }, ecu)).toBe('Ecuaciones, viernes de 08:00 a 10:00');
   });
 });
 

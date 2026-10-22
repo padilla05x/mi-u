@@ -12,7 +12,7 @@ export function nombreMateria(materias: Materia[], id: string): string {
 
 export function agregarMateria(datos: Datos, nombre: string): Datos {
   const color = siguienteColor(datos.materias.map((m) => m.color));
-  return { ...datos, materias: [...datos.materias, { id: nuevoId(), nombre, color, clase: '', moodle: '', classroom: '', ocultaEn: [] }] };
+  return { ...datos, materias: [...datos.materias, { id: nuevoId(), nombre, color, clase: '', moodle: '', classroom: '', tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '', ocultaEn: [] }] };
 }
 
 /** Quita la materia (con sus enlaces) y también sus entregas y sus bloques del horario. */

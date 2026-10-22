@@ -12,6 +12,9 @@ const datos: Datos = {
       clase: '',
       moodle: '',
       classroom: '',
+      tieneClaseAlterna: false,
+      claseAlterna: '',
+      claseAlternaNombre: '',
       ocultaEn: [],
     },
   ],
@@ -174,7 +177,7 @@ describe('importar: secciones ocultas (ocultaEn)', () => {
 });
 
 describe('importar: horario', () => {
-  const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
+  const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', enlace: 'principal', ...cambio });
   const conHorario = (horario: unknown) => con({ horario });
 
   it('un respaldo sin horario queda con horario: []', () => {
@@ -226,5 +229,54 @@ describe('importar: horario', () => {
       ok: false,
       motivo: 'El campo "url" del enlace de Drive 1 ("Carpeta") no es texto.',
     });
+  });
+});
+
+describe('importar: link alterno', () => {
+  const conAlterno = { ...datos.materias[0], tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' };
+  const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 4, inicio: '08:00', fin: '10:00', enlace: 'principal', ...cambio });
+
+  it('un respaldo sin los campos del alterno ni el enlace de los bloques los completa', () => {
+    const materia: Record<string, unknown> = { ...datos.materias[0] };
+    delete materia.tieneClaseAlterna;
+    delete materia.claseAlterna;
+    delete materia.claseAlternaNombre;
+    const bloqueAnterior: Record<string, unknown> = bloque();
+    delete bloqueAnterior.enlace;
+
+    expect(importar(con({ materias: [materia], horario: [bloqueAnterior] }))).toEqual({
+      ok: true,
+      datos: { ...datos, horario: [bloque()] },
+    });
+  });
+
+  it('conserva el alterno y los bloques que lo usan', () => {
+    const horario = [bloque(), bloque({ id: 'b2', dia: 0, enlace: 'alterno' })];
+    expect(importar(con({ materias: [conAlterno], horario }))).toEqual({ ok: true, datos: { ...datos, materias: [conAlterno], horario } });
+  });
+
+  const noEsEnlace = 'El campo "enlace" del bloque 1 ("Física") no es "principal" ni "alterno".';
+  const conCasillaFalsa = 'La materia 1 ("Física") tiene link alterno, pero "tieneClaseAlterna" es falso.';
+  it.each([
+    ['enlace "viernes"', con({ horario: [bloque({ enlace: 'viernes' })] }), noEsEnlace],
+    ['enlace "Alterno" con mayúscula', con({ horario: [bloque({ enlace: 'Alterno' })] }), noEsEnlace],
+    ['enlace numérico', con({ horario: [bloque({ enlace: 1 })] }), noEsEnlace],
+    ['enlace null', con({ horario: [bloque({ enlace: null })] }), noEsEnlace],
+    ['claseAlterna que no es texto', materia({ claseAlterna: 5 }), 'El campo "claseAlterna" de la materia 1 ("Física") no es texto.'],
+    ['claseAlternaNombre null', materia({ claseAlternaNombre: null }), 'El campo "claseAlternaNombre" de la materia 1 ("Física") no es texto.'],
+    [
+      'tieneClaseAlterna como texto',
+      materia({ tieneClaseAlterna: 'true' }),
+      'El campo "tieneClaseAlterna" de la materia 1 ("Física") no es verdadero o falso.',
+    ],
+    ['link alterno con la casilla apagada', materia({ tieneClaseAlterna: false, claseAlterna: 'meet.google.com/vie' }), conCasillaFalsa],
+    ['solo el nombre del alterno con la casilla apagada', materia({ tieneClaseAlterna: false, claseAlternaNombre: 'Viernes' }), conCasillaFalsa],
+    [
+      'bloque que usa el alterno de una materia sin alterno',
+      con({ horario: [bloque({ enlace: 'alterno' })] }),
+      'El bloque 1 ("Física") usa el link alterno, pero su materia no tiene uno.',
+    ],
+  ])('%s', (_caso, texto, motivo) => {
+    expect(importar(texto)).toEqual({ ok: false, motivo });
   });
 });
