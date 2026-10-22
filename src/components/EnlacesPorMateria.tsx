@@ -1,9 +1,10 @@
 import { ArrowDown, BookPlus, Check, ExternalLink, Eye, EyeOff, Pencil, Trash, type LucideIcon } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { nombreAlterno, quitarAlternoPierdeAlgo } from '../lib/clases.ts';
 import { abrirEnlace } from '../lib/enlaces.ts';
 import { materiasOcultas, materiasVisibles } from '../lib/secciones.ts';
-import type { Materia, SeccionEnlace } from '../lib/tipos.ts';
+import type { Bloque, Materia, SeccionEnlace } from '../lib/tipos.ts';
 import Dialogo from './Dialogo.tsx';
 import EstadoVacio from './EstadoVacio.tsx';
 import { botonIconoPeligro, botonSecundario, campo as claseCampo, fila, tituloElemento } from './estilos.ts';
@@ -18,7 +19,19 @@ export interface PropsSeccionEnlaces {
   onQuitar: (id: string, seccion: SeccionEnlace) => void;
   /** Vuelve a mostrarla en la sección, con el enlace vacío. */
   onMostrar: (id: string, seccion: SeccionEnlace) => void;
+  /** Link alterno de la clase virtual: solo lo pasa Clases virtuales. */
+  alterno?: PropsAlterno;
   className?: string;
+}
+
+export interface PropsAlterno {
+  /** Para saber si desmarcar la casilla perdería algo: un bloque que usa el alterno. */
+  horario: Bloque[];
+  /** Marca "Tiene más de un link". */
+  onActivar: (id: string) => void;
+  /** Desmarca la casilla: vacía el alterno y su nombre, y los bloques que lo usaban pasan al principal. */
+  onQuitar: (id: string) => void;
+  onGuardar: (id: string, campo: 'claseAlterna' | 'claseAlternaNombre', valor: string) => void;
 }
 
 interface Props extends PropsSeccionEnlaces {
@@ -36,18 +49,23 @@ const AYUDA_EDICION = 'Quita una materia de esta sección. Su enlace se borra, p
  * Tarjeta con una fila por materia: el nombre arriba y, debajo, el enlace con su botón Abrir, que solo se habilita
  * con un enlace guardado. Va apilada en todos los tamaños porque estas tarjetas son angostas. En modo edición cada
  * fila suma un botón para quitar la materia de esta sección, y al final aparecen las ocultas para mostrarlas de nuevo.
+ * Con `alterno` (Clases virtuales), cada fila puede tener un segundo link: se configura en modo edición con la casilla
+ * "Tiene más de un link" y se abre con su propio botón.
  */
 export default function EnlacesPorMateria(props: Props) {
-  const { seccion, titulo, pista, icono, materias, onGuardar, onQuitar, onMostrar, className, children } = props;
+  const { seccion, titulo, pista, icono, materias, onGuardar, onQuitar, onMostrar, alterno, className, children } = props;
   const id = useId();
   const [editando, setEditando] = useState(false);
   const [porQuitar, setPorQuitar] = useState<Materia | null>(null);
+  const [alternoPorQuitar, setAlternoPorQuitar] = useState<Materia | null>(null);
   // Sin materias no hay nada que editar.
   const enEdicion = editando && materias.length > 0;
   const visibles = materiasVisibles(materias, seccion);
   const ocultas = materiasOcultas(materias, seccion);
   const idEditar = `${id}-editar`;
   const idCampo = (materia: string) => `${id}-enlace-${materia}`;
+  const idAlterno = (materia: string) => `${id}-alterno-${materia}`;
+  const idNombreAlterno = (materia: string) => `${id}-nombre-alterno-${materia}`;
 
   const quitar = (m: Materia) => {
     onQuitar(m.id, seccion);
@@ -58,6 +76,29 @@ export default function EnlacesPorMateria(props: Props) {
     // Su chip ya no existe: el foco pasa a su campo, vacío, para pegar el enlace de nuevo.
     document.getElementById(idCampo(m.id))?.focus();
   };
+  // Desmarcar solo pregunta si se perdería algo: un link o un nombre escritos, o bloques que usan el alterno.
+  const alternarCasilla = (m: Materia) => {
+    if (!alterno) return;
+    if (!m.tieneClaseAlterna) alterno.onActivar(m.id);
+    else if (quitarAlternoPierdeAlgo(m, alterno.horario)) setAlternoPorQuitar(m);
+    else alterno.onQuitar(m.id);
+  };
+  const quitarAlterno = (m: Materia) => {
+    alterno?.onQuitar(m.id);
+    setAlternoPorQuitar(null);
+  };
+  const botonAlterno = (m: Materia) => (
+    <button
+      type="button"
+      className={botonSecundario}
+      disabled={!m.claseAlterna}
+      aria-label={`Abrir clase de ${m.nombre}, ${nombreAlterno(m)}`}
+      onClick={() => abrirEnlace(m.claseAlterna)}
+    >
+      <ExternalLink size={16} aria-hidden="true" />
+      <span className="max-w-32 truncate">{nombreAlterno(m)}</span>
+    </button>
+  );
 
   const botonEditar = materias.length > 0 && (
     <button id={idEditar} type="button" className={botonSecundario} onClick={() => setEditando(!enEdicion)}>
@@ -107,7 +148,7 @@ export default function EnlacesPorMateria(props: Props) {
               <div className="flex items-center gap-2">
                 <CampoDeEnlace
                   id={idCampo(m.id)}
-                  nombre={m.nombre}
+                  ariaLabel={`Enlace de ${m.nombre}`}
                   valor={m[seccion]}
                   onGuardar={(url) => onGuardar(m.id, seccion, url)}
                 />
@@ -115,7 +156,8 @@ export default function EnlacesPorMateria(props: Props) {
                   type="button"
                   className={botonSecundario}
                   disabled={!m[seccion]}
-                  aria-label={`Abrir ${m.nombre}`}
+                  // Con alterno, los dos botones dicen cuál abre cada uno.
+                  aria-label={alterno && m.tieneClaseAlterna ? `Abrir clase de ${m.nombre}, principal` : `Abrir ${m.nombre}`}
                   onClick={() => abrirEnlace(m[seccion])}
                 >
                   <ExternalLink size={16} aria-hidden="true" />
@@ -133,6 +175,49 @@ export default function EnlacesPorMateria(props: Props) {
                   </button>
                 )}
               </div>
+              {alterno && m.tieneClaseAlterna && !enEdicion && <div className="flex justify-end">{botonAlterno(m)}</div>}
+              {alterno && enEdicion && (
+                <div className="grid gap-3">
+                  <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] leading-[18px] font-medium">
+                    <input
+                      type="checkbox"
+                      className="size-[18px] cursor-pointer accent-acento"
+                      checked={m.tieneClaseAlterna}
+                      onChange={() => alternarCasilla(m)}
+                    />
+                    {/* El espacio va fuera del texto oculto: jsdom quita el de adentro y Chromium agrega otro, que se colapsa. */}
+                    Tiene más de un link <span className="sr-only">({m.nombre})</span>
+                  </label>
+                  {m.tieneClaseAlterna && (
+                    <>
+                      <div className="grid min-w-0 gap-1.5">
+                        <label htmlFor={idAlterno(m.id)} className="text-[13px] leading-[18px] font-medium">
+                          Link alterno <span className="sr-only">de {m.nombre}</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <CampoDeEnlace
+                            id={idAlterno(m.id)}
+                            valor={m.claseAlterna}
+                            onGuardar={(url) => alterno.onGuardar(m.id, 'claseAlterna', url)}
+                          />
+                          {botonAlterno(m)}
+                        </div>
+                      </div>
+                      <div className="grid min-w-0 gap-1.5">
+                        <label htmlFor={idNombreAlterno(m.id)} className="text-[13px] leading-[18px] font-medium">
+                          Nombre del link alterno <span className="sr-only">de {m.nombre}</span>
+                        </label>
+                        <CampoDeEnlace
+                          id={idNombreAlterno(m.id)}
+                          valor={m.claseAlternaNombre}
+                          placeholder="Alterno"
+                          onGuardar={(nombre) => alterno.onGuardar(m.id, 'claseAlternaNombre', nombre)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -173,7 +258,20 @@ export default function EnlacesPorMateria(props: Props) {
           // Al confirmar desaparece su fila: el foco pasa a "Listo".
           focoSinOrigen={idEditar}
         >
-          Se borrará su enlace en esta sección. La materia y sus enlaces en las demás secciones no cambian.
+          {alterno && porQuitar.tieneClaseAlterna
+            ? 'Se borrarán su enlace y su link alterno en esta sección, y las clases del horario que usaban el alterno pasarán al link principal. La materia y sus enlaces en las demás secciones no cambian.'
+            : 'Se borrará su enlace en esta sección. La materia y sus enlaces en las demás secciones no cambian.'}
+        </Dialogo>
+      )}
+      {alternoPorQuitar && (
+        <Dialogo
+          titulo={`¿Quitar el link alterno de ${alternoPorQuitar.nombre}?`}
+          accion="Quitar link alterno"
+          iconoAccion={Trash}
+          onConfirmar={() => quitarAlterno(alternoPorQuitar)}
+          onCancelar={() => setAlternoPorQuitar(null)}
+        >
+          Se borrarán el link alterno y su nombre, y las clases del horario que lo usaban pasarán al link principal.
         </Dialogo>
       )}
     </Tarjeta>
@@ -182,13 +280,18 @@ export default function EnlacesPorMateria(props: Props) {
 
 interface PropsCampo {
   id: string;
-  nombre: string;
   valor: string;
-  onGuardar: (url: string) => void;
+  onGuardar: (valor: string) => void;
+  /** Nombre accesible cuando el campo no tiene una etiqueta visible. */
+  ariaLabel?: string;
+  placeholder?: string;
 }
 
-/** Como en mi-u.html, el enlace se guarda al confirmar el campo (al salir de él o con Enter), no en cada tecla. */
-function CampoDeEnlace({ id, nombre, valor, onGuardar }: PropsCampo) {
+/**
+ * Como en mi-u.html, el enlace se guarda al confirmar el campo (al salir de él o con Enter), no en cada tecla, y sin
+ * espacios al inicio ni al final. Lo usan el enlace de cada sección, el link alterno y su nombre.
+ */
+function CampoDeEnlace({ id, valor, onGuardar, ariaLabel, placeholder = 'Pega el enlace' }: PropsCampo) {
   const [borrador, setBorrador] = useState(valor);
   const confirmar = () => {
     const url = borrador.trim();
@@ -199,9 +302,9 @@ function CampoDeEnlace({ id, nombre, valor, onGuardar }: PropsCampo) {
     <input
       id={id}
       type="text"
-      aria-label={`Enlace de ${nombre}`}
+      aria-label={ariaLabel}
       className={`${claseCampo} flex-1`}
-      placeholder="Pega el enlace"
+      placeholder={placeholder}
       value={borrador}
       onChange={(e) => setBorrador(e.target.value)}
       onBlur={confirmar}

@@ -324,6 +324,11 @@ describe.each(SECCIONES_ENLACE)('Modo edición en $titulo', ({ titulo, campo }) 
     await usuario.tab();
     expect(within(tarjeta).getByRole('button', { name: `Quitar Física de ${titulo}` })).toHaveFocus();
     await usuario.tab();
+    // Solo en Clases virtuales la fila suma la casilla del link alterno; en Moodle y Classroom sigue igual.
+    if (campo === 'clase') {
+      expect(within(tarjeta).getByRole('checkbox', { name: 'Tiene más de un link (Física)' })).toHaveFocus();
+      await usuario.tab();
+    }
     expect(within(tarjeta).getByLabelText('Enlace de Química')).toHaveFocus();
 
     // El campo de enlace funciona igual que en modo normal.
@@ -990,6 +995,162 @@ describe('Orden de materias y atajos', () => {
     screen.getByLabelText('Descripción').blur();
     await usuario.keyboard('/');
     expect(screen.getByLabelText('Buscar entregas')).toHaveFocus();
+  });
+});
+
+describe('Link alterno en Clases virtuales', () => {
+  const ecuaciones = (extra: Partial<Materia> = {}) =>
+    materia('ecu', 'Ecuaciones', { clase: 'meet.google.com/lun', moodle: 'moodle.u.edu.co/ecu', ...extra });
+  const conAlterno = { tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' };
+  const bloqueEcu = (id: string, dia: Bloque['dia'], enlace: Bloque['enlace']): Bloque => ({
+    id,
+    materiaId: 'ecu',
+    dia,
+    inicio: '08:00',
+    fin: '10:00',
+    enlace,
+  });
+  const editar = async (usuario: ReturnType<typeof userEvent.setup>, titulo = 'Clases virtuales') =>
+    usuario.click(within(seccion(titulo)).getByRole('button', { name: 'Editar' }));
+
+  it('marcar "Tiene más de un link" muestra sus campos con etiquetas visibles, guarda el alterno y la fila suma su botón', async () => {
+    const { usuario, guardado } = montar({ materias: [ecuaciones(), materia('fis', 'Física')], entregas: [], drive: [] });
+    const clases = seccion('Clases virtuales');
+    await editar(usuario);
+
+    const casilla = within(clases).getByRole('checkbox', { name: 'Tiene más de un link (Ecuaciones)' });
+    expect(casilla).not.toBeChecked();
+    expect(within(clases).queryByLabelText('Link alterno de Ecuaciones')).not.toBeInTheDocument();
+    await usuario.click(casilla);
+
+    expect(casilla).toBeChecked();
+    expect(guardado().materias[0].tieneClaseAlterna).toBe(true);
+    const link = within(clases).getByLabelText('Link alterno de Ecuaciones');
+    const nombre = within(clases).getByLabelText('Nombre del link alterno de Ecuaciones');
+    // Las etiquetas se ven ("Link alterno"); el nombre de la materia solo lo oye el lector de pantalla.
+    expect(link).toHaveAccessibleName('Link alterno de Ecuaciones');
+    expect(nombre).toHaveAccessibleName('Nombre del link alterno de Ecuaciones');
+    expect((link as HTMLInputElement).labels?.[0].firstChild?.textContent?.trim()).toBe('Link alterno');
+    expect((nombre as HTMLInputElement).labels?.[0].firstChild?.textContent?.trim()).toBe('Nombre del link alterno');
+    expect(nombre).toHaveAttribute('placeholder', 'Alterno');
+
+    // Sin nombre, el alterno se llama "Alterno". El link se guarda sin espacios, como el principal.
+    await usuario.type(link, '  meet.google.com/vie  {Enter}');
+    expect(link).toHaveValue('meet.google.com/vie');
+    expect(within(clases).getByRole('button', { name: 'Abrir clase de Ecuaciones, Alterno' })).toHaveTextContent('Alterno');
+    await usuario.type(nombre, 'Viernes');
+    await usuario.tab();
+    expect(guardado().materias[0]).toMatchObject({ tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' });
+
+    // Vista normal: dos botones con nombres claros, y abren cada uno su link con https://.
+    await usuario.click(within(clases).getByRole('button', { name: 'Listo' }));
+    const abrir = vi.spyOn(window, 'open').mockReturnValue(null);
+    const viernes = within(clases).getByRole('button', { name: 'Abrir clase de Ecuaciones, Viernes' });
+    expect(viernes).toHaveTextContent('Viernes');
+    await usuario.click(viernes);
+    expect(abrir).toHaveBeenLastCalledWith('https://meet.google.com/vie', '_blank', 'noopener');
+    await usuario.click(within(clases).getByRole('button', { name: 'Abrir clase de Ecuaciones, principal' }));
+    expect(abrir).toHaveBeenLastCalledWith('https://meet.google.com/lun', '_blank', 'noopener');
+
+    // Sin alterno, la fila queda como siempre.
+    expect(within(clases).getByRole('button', { name: 'Abrir Física' })).toBeInTheDocument();
+    expect(within(clases).queryByRole('button', { name: /^Abrir clase de Física/ })).not.toBeInTheDocument();
+  });
+
+  it('desmarcar sin nada que perder no pregunta; con un bloque que usa el alterno, sí', async () => {
+    const vacio = { tieneClaseAlterna: true, claseAlterna: '', claseAlternaNombre: '' };
+    const { usuario, guardado } = montar({ materias: [ecuaciones(vacio)], entregas: [], drive: [] });
+    await editar(usuario);
+
+    await usuario.click(within(seccion('Clases virtuales')).getByRole('checkbox', { name: 'Tiene más de un link (Ecuaciones)' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(guardado().materias[0].tieneClaseAlterna).toBe(false);
+    cleanup();
+
+    const otro = montar({ materias: [ecuaciones(vacio)], entregas: [], drive: [], horario: [bloqueEcu('b1', 4, 'alterno')] });
+    await editar(otro.usuario);
+    await otro.usuario.click(within(seccion('Clases virtuales')).getByRole('checkbox', { name: 'Tiene más de un link (Ecuaciones)' }));
+    expect(screen.getByRole('dialog', { name: '¿Quitar el link alterno de Ecuaciones?' })).toBeInTheDocument();
+  });
+
+  it('desmarcar con un link guardado pide confirmación: Cancelar no cambia nada; confirmar vacía el alterno y los bloques pasan al principal', async () => {
+    const { usuario, guardado } = montar({
+      materias: [ecuaciones(conAlterno)],
+      entregas: [],
+      drive: [],
+      horario: [bloqueEcu('lun', 0, 'principal'), bloqueEcu('vie', 4, 'alterno')],
+    });
+    const antes = guardado();
+    const clases = seccion('Clases virtuales');
+    await editar(usuario);
+    const casilla = within(clases).getByRole('checkbox', { name: 'Tiene más de un link (Ecuaciones)' });
+
+    await usuario.click(casilla);
+    const dialogo = screen.getByRole('dialog', { name: '¿Quitar el link alterno de Ecuaciones?' });
+    expect(dialogo).toHaveAccessibleDescription(
+      'Se borrarán el link alterno y su nombre, y las clases del horario que lo usaban pasarán al link principal.',
+    );
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toHaveFocus();
+    expect(within(dialogo).getByRole('button', { name: 'Quitar link alterno' })).toHaveClass('bg-peligro-suave');
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Cancelar' }));
+
+    expect(casilla).toBeChecked();
+    expect(casilla).toHaveFocus();
+    expect(within(clases).getByLabelText('Link alterno de Ecuaciones')).toHaveValue('meet.google.com/vie');
+    expect(guardado()).toEqual(antes);
+
+    await usuario.click(casilla);
+    await usuario.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Quitar link alterno' }));
+
+    expect(casilla).not.toBeChecked();
+    expect(within(clases).queryByLabelText('Link alterno de Ecuaciones')).not.toBeInTheDocument();
+    expect(guardado().materias[0]).toMatchObject({ tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '' });
+    expect(guardado().horario.map((b) => [b.id, b.enlace])).toEqual([
+      ['lun', 'principal'],
+      ['vie', 'principal'],
+    ]);
+  });
+
+  it('quitar la materia de Clases virtuales en Editar también borra su alterno, con la misma cascada', async () => {
+    const { usuario, guardado } = montar({
+      materias: [ecuaciones(conAlterno)],
+      entregas: [],
+      drive: [],
+      horario: [bloqueEcu('vie', 4, 'alterno')],
+    });
+    await editar(usuario);
+
+    await usuario.click(within(seccion('Clases virtuales')).getByRole('button', { name: 'Quitar Ecuaciones de Clases virtuales' }));
+    const dialogo = screen.getByRole('dialog', { name: '¿Quitar Ecuaciones de Clases virtuales?' });
+    expect(dialogo).toHaveAccessibleDescription(
+      'Se borrarán su enlace y su link alterno en esta sección, y las clases del horario que usaban el alterno pasarán al link principal. La materia y sus enlaces en las demás secciones no cambian.',
+    );
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Quitar' }));
+
+    expect(guardado().materias[0]).toMatchObject({
+      clase: '',
+      moodle: 'moodle.u.edu.co/ecu',
+      tieneClaseAlterna: false,
+      claseAlterna: '',
+      claseAlternaNombre: '',
+      ocultaEn: ['clase'],
+    });
+    expect(guardado().horario[0].enlace).toBe('principal');
+  });
+
+  it.each(['Aula virtual (Moodle)', 'Classroom'])('%s no cambia: sin casilla en Editar y un solo botón aunque la materia tenga alterno', async (titulo) => {
+    const { usuario } = montar({
+      materias: [ecuaciones({ ...conAlterno, classroom: 'classroom.google.com/ecu' })],
+      entregas: [],
+      drive: [],
+    });
+    const tarjeta = seccion(titulo);
+    expect(within(tarjeta).getByRole('button', { name: 'Abrir Ecuaciones' })).toBeInTheDocument();
+    expect(within(tarjeta).queryByRole('button', { name: /^Abrir clase de/ })).not.toBeInTheDocument();
+
+    await editar(usuario, titulo);
+    expect(within(tarjeta).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(within(tarjeta).queryByText(/Link alterno/)).not.toBeInTheDocument();
   });
 });
 
