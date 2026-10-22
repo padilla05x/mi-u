@@ -1,9 +1,10 @@
 import { ArrowDown, BookPlus, CalendarClock, CalendarPlus, Plus, Trash } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useErrorFormulario } from '../hooks/useErrorFormulario.ts';
+import { nombreAlterno, nombreDelEnlace } from '../lib/clases.ts';
 import { nombreMateria } from '../lib/datos.ts';
 import { describirBloque, DIAS, horarioPorDia, validarBloque, type BloqueNuevo } from '../lib/horario.ts';
-import type { Bloque, DiaSemana, Materia } from '../lib/tipos.ts';
+import type { Bloque, DiaSemana, EnlaceBloque, Materia } from '../lib/tipos.ts';
 import Campo from './Campo.tsx';
 import EstadoVacio from './EstadoVacio.tsx';
 import { botonIcono, botonPrincipal, campo, fila, tituloElemento } from './estilos.ts';
@@ -29,10 +30,14 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
   const [dia, setDia] = useState<DiaSemana>(0);
   const [inicio, setInicio] = useState('');
   const [fin, setFin] = useState('');
+  const [enlace, setEnlace] = useState<EnlaceBloque>('principal');
   const { error, mostrar: mostrarError, limpiar: limpiarError } = useErrorFormulario();
   // Si la materia elegida ya no existe (o aún no se eligió), queda la primera, como en Entregas.
   const materiaElegida = materias.some((m) => m.id === materia) ? materia : (materias[0]?.id ?? '');
   const porId = new Map(materias.map((m) => [m.id, m]));
+  // El select "Link" solo aparece si la materia tiene alterno; si no, el bloque usa el principal.
+  const conAlterno = porId.get(materiaElegida)?.tieneClaseAlterna ? porId.get(materiaElegida) : undefined;
+  const enlaceElegido: EnlaceBloque = conAlterno ? enlace : 'principal';
 
   const cambiar = <T,>(guardar: (valor: T) => void) => (valor: T) => {
     guardar(valor);
@@ -44,7 +49,7 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
       mostrarError('Completa la hora de inicio y la de fin.');
       return;
     }
-    const nuevo: BloqueNuevo = { materiaId: materiaElegida, dia, inicio, fin, enlace: 'principal' };
+    const nuevo: BloqueNuevo = { materiaId: materiaElegida, dia, inicio, fin, enlace: enlaceElegido };
     const motivo = validarBloque(nuevo, horario, materias);
     if (motivo) {
       mostrarError(motivo);
@@ -75,13 +80,24 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
         />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <div
+            className={`grid gap-3 md:items-end ${
+              conAlterno
+                ? // Con el select "Link" son cinco campos: en tablet van en tres columnas para que las horas quepan.
+                  'md:grid-cols-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]'
+                : 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]'
+            }`}
+          >
             <Campo id="horario-materia" etiqueta="Materia">
               <select
                 id="horario-materia"
                 className={campo}
                 value={materiaElegida}
-                onChange={(e) => cambiar(setMateria)(e.target.value)}
+                onChange={(e) => {
+                  // Otra materia, otros links: se vuelve al principal (elegir la misma no lo cambia).
+                  if (e.target.value !== materiaElegida) setEnlace('principal');
+                  cambiar(setMateria)(e.target.value);
+                }}
               >
                 {materias.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -90,6 +106,19 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
                 ))}
               </select>
             </Campo>
+            {conAlterno && (
+              <Campo id="horario-enlace" etiqueta="Link">
+                <select
+                  id="horario-enlace"
+                  className={campo}
+                  value={enlaceElegido}
+                  onChange={(e) => cambiar(setEnlace)(e.target.value as EnlaceBloque)}
+                >
+                  <option value="principal">Principal</option>
+                  <option value="alterno">{nombreAlterno(conAlterno)}</option>
+                </select>
+              </Campo>
+            )}
             <Campo id="horario-dia" etiqueta="Día">
               <select
                 id="horario-dia"
@@ -141,9 +170,11 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
                     </h3>
                     <ul aria-labelledby={`${id}-dia-${diaGrupo}`} className="mt-1">
                       {bloques.map((bloque) => {
+                        const materiaDelBloque = porId.get(bloque.materiaId);
                         const nombre = nombreMateria(materias, bloque.materiaId);
-                        const descripcion = describirBloque(bloque, nombre);
-                        const color = porId.get(bloque.materiaId)?.color;
+                        const descripcion = describirBloque(bloque, materiaDelBloque);
+                        const enlaceAlterno = materiaDelBloque && nombreDelEnlace(bloque, materiaDelBloque);
+                        const color = materiaDelBloque?.color;
                         return (
                           <li key={bloque.id} className={`${fila} flex items-center gap-3`}>
                             {/* El lector de pantalla oye la frase completa; lo que se ve va oculto para que no lo repita. */}
@@ -156,6 +187,9 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
                               <span className={`${tituloElemento} truncate`} title={nombre}>
                                 {nombre}
                               </span>
+                              {enlaceAlterno && (
+                                <span className="shrink-0 text-[13px] leading-[18px] text-tenue">· {enlaceAlterno}</span>
+                              )}
                             </span>
                             <button
                               type="button"

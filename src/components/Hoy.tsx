@@ -1,4 +1,5 @@
 import { ArrowDown, Coffee, LogIn, Radio, Sun } from 'lucide-react';
+import { enlaceDeBloque, nombreDelEnlace } from '../lib/clases.ts';
 import { completarUrl } from '../lib/enlaces.ts';
 import { diaDeSemanaEnBogota } from '../lib/fechas.ts';
 import { clasesDeHoy, DIAS, enCurso } from '../lib/horario.ts';
@@ -47,6 +48,10 @@ export default function Hoy({ horario, materias, ahora, className }: Props) {
           {clases.map((bloque) => {
             const materia = porId.get(bloque.materiaId);
             const nombre = materia?.nombre ?? 'Materia eliminada';
+            // El link que eligió el bloque en el Horario: el principal o el alterno.
+            const url = materia ? enlaceDeBloque(bloque, materia) : '';
+            const enlaceAlterno = materia && nombreDelEnlace(bloque, materia);
+            const deCual = enlaceAlterno ? `${nombre}, ${enlaceAlterno}` : nombre;
             return (
               // En móvil la hora va arriba y el nombre debajo; desde md, todo en una fila.
               <li
@@ -66,6 +71,7 @@ export default function Hoy({ horario, materias, ahora, className }: Props) {
                   <span className={`${tituloElemento} truncate`} title={nombre}>
                     {nombre}
                   </span>
+                  {enlaceAlterno && <span className="shrink-0 text-[13px] leading-[18px] text-tenue">· {enlaceAlterno}</span>}
                   {enCurso(bloque, ahora) && (
                     <span className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full bg-acento-suave px-2.5 text-[12px] leading-4 font-semibold text-acento">
                       <Radio size={14} aria-hidden="true" />
@@ -74,13 +80,13 @@ export default function Hoy({ horario, materias, ahora, className }: Props) {
                   )}
                 </span>
                 <span className="col-start-2 row-span-2 row-start-1 md:col-start-3 md:row-span-1">
-                  {materia?.clase ? (
+                  {url ? (
                     <a
-                      href={completarUrl(materia.clase)}
+                      href={completarUrl(url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={enlaceSecundario}
-                      aria-label={`Entrar a la clase de ${nombre}`}
+                      aria-label={`Entrar a la clase de ${deCual}`}
                     >
                       <LogIn size={16} aria-hidden="true" />
                       Entrar
@@ -90,8 +96,8 @@ export default function Hoy({ horario, materias, ahora, className }: Props) {
                       type="button"
                       className={botonSecundario}
                       disabled
-                      aria-label={`Sin enlace para ${nombre}`}
-                      title="Agrega su enlace en Clases virtuales"
+                      aria-label={`Sin enlace para ${deCual}`}
+                      title={enlaceAlterno ? 'Agrega su link alterno en Clases virtuales' : 'Agrega su enlace en Clases virtuales'}
                     >
                       Sin enlace
                     </button>

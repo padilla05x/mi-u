@@ -229,7 +229,16 @@ describe('horarioPorDia y describirBloque', () => {
   });
 
   it('describe el bloque con la materia, el día y las horas', () => {
-    expect(describirBloque(bloque('b', { dia: 2, inicio: '08:00', fin: '10:00' }), 'Física')).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(describirBloque(bloque('b', { dia: 2, inicio: '08:00', fin: '10:00' }), materias[0])).toBe('Física, miércoles de 08:00 a 10:00');
+    expect(describirBloque(bloque('b'), undefined)).toBe('Materia eliminada, lunes de 08:00 a 10:00');
+  });
+
+  it('si el bloque usa el link alterno, lo nombra; con el principal, igual que siempre', () => {
+    const ecu = { ...materia('ecu', 'Ecuaciones'), tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' };
+    const viernes = bloque('b', { materiaId: 'ecu', dia: 4, enlace: 'alterno' });
+    expect(describirBloque(viernes, ecu)).toBe('Ecuaciones, viernes de 08:00 a 10:00, link Viernes');
+    expect(describirBloque(viernes, { ...ecu, claseAlternaNombre: '' })).toBe('Ecuaciones, viernes de 08:00 a 10:00, link Alterno');
+    expect(describirBloque({ ...viernes, enlace: 'principal' }, ecu)).toBe('Ecuaciones, viernes de 08:00 a 10:00');
   });
 });
 

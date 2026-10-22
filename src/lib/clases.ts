@@ -46,6 +46,23 @@ export function quitarClaseAlterna(datos: Datos, id: string): Datos {
   };
 }
 
+/**
+ * El link que abre el bloque: el alterno si el bloque lo usa, o el principal (clase). Puede estar vacío. Un bloque que
+ * dice usar el alterno de una materia sin alterno no debería existir (la migración y quitarClaseAlterna lo evitan);
+ * si pasa, abre el principal.
+ */
+export function enlaceDeBloque(
+  bloque: Pick<Bloque, 'enlace'>,
+  materia: Pick<Materia, 'clase' | 'tieneClaseAlterna' | 'claseAlterna'>,
+): string {
+  return bloque.enlace === 'alterno' && materia.tieneClaseAlterna ? materia.claseAlterna : materia.clase;
+}
+
+/** El nombre del link que usa el bloque si es el alterno ("Viernes"), o null si usa el principal. */
+export function nombreDelEnlace(bloque: Pick<Bloque, 'enlace'>, materia: Pick<Materia, 'tieneClaseAlterna' | 'claseAlternaNombre'>): string | null {
+  return bloque.enlace === 'alterno' && materia.tieneClaseAlterna ? nombreAlterno(materia) : null;
+}
+
 const reemplazar = (datos: Datos, materia: Materia): Datos => ({
   ...datos,
   materias: datos.materias.map((m) => (m.id === materia.id ? materia : m)),

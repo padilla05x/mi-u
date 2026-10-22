@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { activarClaseAlterna, guardarClaseAlterna, nombreAlterno, quitarAlternoPierdeAlgo, quitarClaseAlterna } from './clases.ts';
+import {
+  activarClaseAlterna,
+  enlaceDeBloque,
+  guardarClaseAlterna,
+  nombreAlterno,
+  nombreDelEnlace,
+  quitarAlternoPierdeAlgo,
+  quitarClaseAlterna,
+} from './clases.ts';
 import type { Bloque, Datos, Materia } from './tipos.ts';
 
 const materia = (id: string, extra: Partial<Materia> = {}): Materia => ({
@@ -101,5 +109,24 @@ describe('quitarClaseAlterna', () => {
   it('no hace nada si la materia no existe o no tiene la casilla marcada', () => {
     expect(quitarClaseAlterna(datos, 'x')).toBe(datos);
     expect(quitarClaseAlterna(datos, 'fis')).toBe(datos);
+  });
+});
+
+describe('enlaceDeBloque y nombreDelEnlace (lo que abre Hoy)', () => {
+  it('un bloque con el principal abre clase; con el alterno, claseAlterna', () => {
+    expect(enlaceDeBloque(bloque('b1', 'ecu'), ecu)).toBe('meet.google.com/ecu');
+    expect(enlaceDeBloque(bloque('b2', 'ecu', 'alterno'), ecu)).toBe('meet.google.com/vie');
+    expect(nombreDelEnlace(bloque('b1', 'ecu'), ecu)).toBeNull();
+    expect(nombreDelEnlace(bloque('b2', 'ecu', 'alterno'), ecu)).toBe('Viernes');
+  });
+
+  it('si el link elegido está vacío, devuelve vacío (Hoy muestra "Sin enlace")', () => {
+    expect(enlaceDeBloque(bloque('b2', 'ecu', 'alterno'), { ...ecu, claseAlterna: '' })).toBe('');
+    expect(enlaceDeBloque(bloque('b1', 'ecu'), { ...ecu, clase: '' })).toBe('');
+  });
+
+  it('un bloque con el alterno de una materia sin alterno abre el principal', () => {
+    expect(enlaceDeBloque(bloque('b9', 'fis', 'alterno'), fis)).toBe('meet.google.com/fis');
+    expect(nombreDelEnlace(bloque('b9', 'fis', 'alterno'), fis)).toBeNull();
   });
 });

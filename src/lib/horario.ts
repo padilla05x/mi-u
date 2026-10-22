@@ -1,6 +1,7 @@
 // Horario semanal: clases fijas por día, en hora de Bogotá. Las horas son "HH:MM" de 24 horas, así que compararlas
 // como texto las compara en orden.
 import { motivoBloque } from './almacen.ts';
+import { nombreDelEnlace } from './clases.ts';
 import { nombreMateria, nuevoId } from './datos.ts';
 import { diaDeSemanaEnBogota, horaEnBogota } from './fechas.ts';
 import type { Bloque, Datos, DiaSemana, Materia } from './tipos.ts';
@@ -47,9 +48,14 @@ export function horarioPorDia(horario: Bloque[]): { dia: DiaSemana; bloques: Blo
   );
 }
 
-/** "Física, lunes de 08:00 a 10:00": el nombre accesible del bloque. */
-export function describirBloque(bloque: Bloque, nombreMateria: string): string {
-  return `${nombreMateria}, ${DIAS[bloque.dia]} de ${bloque.inicio} a ${bloque.fin}`;
+/**
+ * El nombre accesible del bloque: "Física, lunes de 08:00 a 10:00". Si usa el link alterno, lo dice:
+ * "Ecuaciones, viernes de 08:00 a 10:00, link Viernes". Sin materia, "Materia eliminada".
+ */
+export function describirBloque(bloque: Bloque, materia: Materia | undefined): string {
+  const enlace = materia && nombreDelEnlace(bloque, materia);
+  const texto = `${materia?.nombre ?? 'Materia eliminada'}, ${DIAS[bloque.dia]} de ${bloque.inicio} a ${bloque.fin}`;
+  return enlace ? `${texto}, link ${enlace}` : texto;
 }
 
 /** true si el bloque es de hoy y la hora en Bogotá ya llegó a su inicio sin llegar a su fin: [inicio, fin). */

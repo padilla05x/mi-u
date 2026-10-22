@@ -1335,6 +1335,100 @@ describe('Hoy y Horario', () => {
     expect(clasesDeHoy()).toHaveLength(2);
   });
 
+  describe('con link alterno', () => {
+    // Ecuaciones tiene dos links: el principal (lunes) y el alterno "Viernes". Química no tiene alterno.
+    const ecuaciones = (extra: Partial<Materia> = {}) =>
+      materia('ecu', 'Ecuaciones', {
+        clase: 'meet.google.com/lun',
+        tieneClaseAlterna: true,
+        claseAlterna: 'meet.google.com/vie',
+        claseAlternaNombre: 'Viernes',
+        ...extra,
+      });
+    const datosAlterno = (horario: Bloque[] = [], extra: Partial<Materia> = {}) => ({
+      materias: [ecuaciones(extra), materia('qui', 'Química')],
+      entregas: [],
+      drive: [],
+      horario,
+    });
+
+    it('el select "Link" solo aparece si la materia tiene alterno, empieza en "Principal" y vuelve a él al cambiar de materia', async () => {
+      const { usuario } = montar(datosAlterno());
+      const horario = seccion('Horario');
+
+      await usuario.selectOptions(within(horario).getByLabelText('Materia'), 'Química');
+      expect(within(horario).queryByLabelText('Link')).not.toBeInTheDocument();
+
+      await usuario.selectOptions(within(horario).getByLabelText('Materia'), 'Ecuaciones');
+      const link = within(horario).getByLabelText('Link');
+      expect(within(link).getAllByRole('option').map((o) => o.textContent)).toEqual(['Principal', 'Viernes']);
+      expect(link).toHaveDisplayValue('Principal');
+
+      await usuario.selectOptions(link, 'Viernes');
+      expect(link).toHaveDisplayValue('Viernes');
+      await usuario.selectOptions(within(horario).getByLabelText('Materia'), 'Química');
+      await usuario.selectOptions(within(horario).getByLabelText('Materia'), 'Ecuaciones');
+      expect(within(horario).getByLabelText('Link')).toHaveDisplayValue('Principal');
+    });
+
+    it('guarda el bloque con el alterno y lo nombra: "Ecuaciones, viernes de 08:00 a 10:00, link Viernes"', async () => {
+      const { usuario, guardado } = montar(datosAlterno());
+      const horario = seccion('Horario');
+
+      await usuario.selectOptions(within(horario).getByLabelText('Materia'), 'Ecuaciones');
+      await usuario.selectOptions(within(horario).getByLabelText('Link'), 'Viernes');
+      await llenar(usuario, 'Ecuaciones', 'Viernes', '08:00', '10:00');
+      // Sin tocar el select, el bloque usa el principal.
+      await usuario.selectOptions(within(horario).getByLabelText('Link'), 'Principal');
+      await llenar(usuario, 'Ecuaciones', 'Lunes', '08:00', '10:00');
+
+      expect(guardado().horario.map((b) => [b.dia, b.enlace])).toEqual([
+        [4, 'alterno'],
+        [0, 'principal'],
+      ]);
+      const fila = filaDelHorario('Ecuaciones, viernes de 08:00 a 10:00, link Viernes');
+      expect(fila).toBeInTheDocument();
+      expect(fila).toHaveTextContent('· Viernes');
+      expect(filaDelHorario('Ecuaciones, lunes de 08:00 a 10:00')).toBeInTheDocument();
+      expect(within(horario).getByRole('button', { name: 'Borrar Ecuaciones, viernes de 08:00 a 10:00, link Viernes' })).toBeInTheDocument();
+    });
+
+    it('Hoy abre el link que eligió cada bloque: el principal o el alterno', () => {
+      // AHORA es miércoles (dia 2).
+      montar(datosAlterno([bloqueDe('b-lun', 'ecu', 2, '08:00', '10:00'), bloqueDe('b-vie', 'ecu', 2, '14:00', '16:00', 'alterno')]));
+      const [principal, alterno] = clasesDeHoy();
+
+      expect(within(principal).getByRole('link', { name: 'Entrar a la clase de Ecuaciones' })).toHaveAttribute('href', 'https://meet.google.com/lun');
+      const entrar = within(alterno).getByRole('link', { name: 'Entrar a la clase de Ecuaciones, Viernes' });
+      expect(entrar).toHaveAttribute('href', 'https://meet.google.com/vie');
+      expect(entrar).toHaveAttribute('target', '_blank');
+      expect(entrar).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(alterno).toHaveTextContent('· Viernes');
+      expect(principal).not.toHaveTextContent('Viernes');
+    });
+
+    it('si el link elegido está vacío, Hoy muestra "Sin enlace" solo en ese bloque', () => {
+      montar(datosAlterno([bloqueDe('b-lun', 'ecu', 2, '08:00', '10:00'), bloqueDe('b-vie', 'ecu', 2, '14:00', '16:00', 'alterno')], { claseAlterna: '' }));
+      const [principal, alterno] = clasesDeHoy();
+
+      expect(within(principal).getByRole('link', { name: 'Entrar a la clase de Ecuaciones' })).toBeInTheDocument();
+      expect(within(alterno).queryByRole('link')).not.toBeInTheDocument();
+      expect(within(alterno).getByRole('button', { name: 'Sin enlace para Ecuaciones, Viernes' })).toBeDisabled();
+    });
+
+    it('al quitar el alterno en Clases virtuales, el bloque de Hoy pasa a abrir el principal', async () => {
+      const { usuario } = montar(datosAlterno([bloqueDe('b-vie', 'ecu', 2, '14:00', '16:00', 'alterno')]));
+      const clases = seccion('Clases virtuales');
+
+      await usuario.click(within(clases).getByRole('button', { name: 'Editar' }));
+      await usuario.click(within(clases).getByRole('checkbox', { name: 'Tiene más de un link (Ecuaciones)' }));
+      await usuario.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Quitar link alterno' }));
+
+      expect(within(clasesDeHoy()[0]).getByRole('link', { name: 'Entrar a la clase de Ecuaciones' })).toHaveAttribute('href', 'https://meet.google.com/lun');
+      expect(filaDelHorario('Ecuaciones, miércoles de 14:00 a 16:00')).toBeInTheDocument();
+    });
+  });
+
   it('quitar una materia borra sus bloques del horario y de Hoy, y deshacer los devuelve', async () => {
     const { usuario, guardado } = montar(semana());
 
