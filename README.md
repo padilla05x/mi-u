@@ -136,6 +136,11 @@ mi-u.html       versión anterior, en un solo archivo
 - **Diseño.** Las decisiones visuales están en [docs/diseno.md](docs/diseno.md). La prueba `src/diseno.test.ts` comprueba que los colores de `src/index.css` coinciden con ese documento y que cumplen el contraste WCAG AA. Si cambias un color, cámbialo en los dos lados.
 - **Antes de proponer un cambio,** corre `npm test`, `npm run lint` y `npm run build`.
 
+## Cómo contribuir o probar cambios
+
+- **Versión publicada:** <https://padilla05x.github.io/mi-u/>. Se actualiza sola con cada push a `main`.
+- **Los datos son del navegador,** así que la versión publicada no ve lo que guardaste en <http://localhost:5173>. Para pasarlos, usa Exportar datos en Respaldo de una y luego Importar datos en la otra.
+
 ## Hoja de ruta
 
 - [x] Reestructurar el proyecto con Vite + React + TypeScript
