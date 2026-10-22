@@ -17,7 +17,7 @@ describe('siguienteColor', () => {
 describe('agregarMateria', () => {
   it('le da a la materia nueva el siguiente color', () => {
     const datos = {
-      materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea' as const, clase: '', moodle: '', classroom: '', ocultaEn: [] }],
+      materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea' as const, clase: '', moodle: '', classroom: '', tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '', ocultaEn: [] }],
       entregas: [],
       drive: [],
       horario: [],

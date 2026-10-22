@@ -15,6 +15,15 @@ export interface Materia {
   moodle: string;
   /** Enlace de la clase en Google Classroom. */
   classroom: string;
+  /**
+   * Casilla "Tiene más de un link": la clase virtual tiene un segundo enlace, por ejemplo para otro día. Es un campo
+   * propio, como ocultaEn, para que la casilla no dependa de que el link alterno tenga texto mientras se edita.
+   */
+  tieneClaseAlterna: boolean;
+  /** Segundo enlace de la clase virtual; vacío si tieneClaseAlterna es false. */
+  claseAlterna: string;
+  /** Nombre del enlace alterno, por ejemplo "Viernes"; si está vacío se muestra "Alterno". */
+  claseAlternaNombre: string;
   /** Secciones de las que se quitó: ahí no aparece, pero sigue en las demás, en Entregas y en Mis materias. */
   ocultaEn: SeccionEnlace[];
 }
@@ -40,6 +49,9 @@ export interface DriveLink {
 /** Día de la semana del horario: 0 = lunes … 6 = domingo. */
 export type DiaSemana = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
+/** Qué enlace de clase virtual abre un bloque: el de la materia (clase) o su alterno (claseAlterna). */
+export type EnlaceBloque = 'principal' | 'alterno';
+
 /** Una clase del horario semanal, en hora de Bogotá. */
 export interface Bloque {
   id: string;
@@ -49,6 +61,7 @@ export interface Bloque {
   /** "HH:MM" de 24 horas; termina después de empezar, el mismo día. */
   inicio: string;
   fin: string;
+  enlace: EnlaceBloque;
 }
 
 export interface Datos {

@@ -15,14 +15,14 @@ const MATERIAS_BASE = [
 ];
 
 const datosNuevos: Datos = {
-  materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea', clase: 'https://meet.google.com/abc', moodle: '', classroom: '', ocultaEn: [] }],
+  materias: [{ id: 'm1', nombre: 'Ingeniería de Software', color: 'orquidea', clase: 'https://meet.google.com/abc', moodle: '', classroom: '', tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '', ocultaEn: [] }],
   entregas: [{ id: 'e1', materia: 'm1', texto: 'Taller 3', fecha: '2026-10-20T20:00:00-05:00', hecha: false, avisada: false }],
   drive: [{ id: 'd1', nombre: 'Carpeta de PETI', url: 'https://drive.google.com/drive/folders/abc' }],
   horario: [],
 };
 
 /** Un bloque válido de la materia de datosNuevos, con un cambio. */
-const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', ...cambio });
+const bloque = (cambio: Record<string, unknown> = {}) => ({ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', enlace: 'principal', ...cambio });
 
 const lanza = (nombre: string) => (): never => {
   throw new DOMException('Simulado en la prueba', nombre);
@@ -90,6 +90,9 @@ describe('abrirAlmacen', () => {
     ['bloque con un día fuera de 0..6', JSON.stringify({ ...datosNuevos, horario: [bloque({ dia: 7 })] })],
     ['bloque con una hora mal formada', JSON.stringify({ ...datosNuevos, horario: [bloque({ inicio: '8:00' })] })],
     ['bloque que termina antes de empezar', JSON.stringify({ ...datosNuevos, horario: [bloque({ inicio: '10:00', fin: '08:00' })] })],
+    ['bloque con un enlace que no es principal ni alterno', JSON.stringify({ ...datosNuevos, horario: [bloque({ enlace: 'viernes' })] })],
+    ['claseAlterna no es texto', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], claseAlterna: 5 }] })],
+    ['tieneClaseAlterna no es booleano', JSON.stringify({ ...datosNuevos, materias: [{ ...datosNuevos.materias[0], tieneClaseAlterna: 'sí' }] })],
   ])('forma incorrecta (%s): copia, estado inicial y aviso', (_caso, crudo) => {
     const storage = storageFalso({ [CLAVE]: crudo });
     const { datos, aviso } = abrirAlmacen(storage);
@@ -257,6 +260,65 @@ describe('horario al cargar', () => {
     expect(aviso).toBeNull();
     expect(datos.horario.map((b) => b.id)).toEqual(['b1']);
     expect(nombres(datos)).toEqual(['Ingeniería de Software']);
+    expect(storage.valores.has(CLAVE_CORRUPTO)).toBe(false);
+  });
+});
+
+describe('link alterno al cargar', () => {
+  const guardados = (materias: object[], horario: object[] = []) =>
+    storageFalso({ [CLAVE]: JSON.stringify({ ...datosNuevos, materias, horario }) });
+  /** La materia de datosNuevos como se guardaba antes del link alterno. */
+  const anterior = () => {
+    const materia: Partial<Materia> = { ...datosNuevos.materias[0] };
+    delete materia.tieneClaseAlterna;
+    delete materia.claseAlterna;
+    delete materia.claseAlternaNombre;
+    return materia;
+  };
+  const conAlterno = { ...datosNuevos.materias[0], tieneClaseAlterna: true, claseAlterna: 'meet.google.com/vie', claseAlternaNombre: 'Viernes' };
+
+  it('las materias sin el alterno quedan sin él, los bloques sin enlace usan el principal y se guarda al primer cambio', () => {
+    const bloqueAnterior: Record<string, unknown> = bloque();
+    delete bloqueAnterior.enlace;
+    const crudo = JSON.stringify({ ...datosNuevos, materias: [anterior()], horario: [bloqueAnterior] });
+    const storage = storageFalso({ [CLAVE]: crudo });
+    const almacen = abrirAlmacen(storage);
+
+    expect(almacen.aviso).toBeNull();
+    expect(almacen.datos.materias[0]).toEqual(datosNuevos.materias[0]);
+    expect(almacen.datos.materias[0]).toMatchObject({ tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '' });
+    expect(almacen.datos.horario[0].enlace).toBe('principal');
+    expect(storage.valores.get(CLAVE)).toBe(crudo); // Cargar no escribe nada.
+
+    almacen.guardar(almacen.datos);
+    const guardado = JSON.parse(storage.valores.get(CLAVE)!);
+    expect(guardado.materias[0]).toMatchObject({ tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '' });
+    expect(guardado.horario[0].enlace).toBe('principal');
+  });
+
+  it('si no está la casilla, la deduce del texto del alterno', () => {
+    expect(abrirAlmacen(guardados([{ ...anterior(), claseAlterna: 'meet.google.com/vie' }])).datos.materias[0]).toMatchObject({
+      tieneClaseAlterna: true,
+      claseAlterna: 'meet.google.com/vie',
+      claseAlternaNombre: '',
+    });
+    expect(abrirAlmacen(guardados([{ ...anterior(), claseAlternaNombre: 'Viernes' }])).datos.materias[0].tieneClaseAlterna).toBe(true);
+  });
+
+  it('conserva el alterno, también vacío con la casilla marcada, y los bloques que lo usan', () => {
+    const vacio = { ...conAlterno, id: 'm2', nombre: 'Física', claseAlterna: '', claseAlternaNombre: '' };
+    const horario = [bloque(), bloque({ id: 'b2', dia: 4, enlace: 'alterno' }), bloque({ id: 'b3', materiaId: 'm2', enlace: 'alterno' })];
+    expect(abrirAlmacen(guardados([conAlterno, vacio], horario))).toMatchObject({ datos: { materias: [conAlterno, vacio], horario }, aviso: null });
+  });
+
+  it('corrige lo inconsistente sin rechazar los datos: alterno sin la casilla y bloques que usan un alterno que no hay', () => {
+    const sinCasilla = { ...conAlterno, tieneClaseAlterna: false };
+    const storage = guardados([sinCasilla], [bloque({ enlace: 'alterno' })]);
+    const { datos, aviso } = abrirAlmacen(storage);
+
+    expect(aviso).toBeNull();
+    expect(datos.materias[0]).toMatchObject({ tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '' });
+    expect(datos.horario[0].enlace).toBe('principal');
     expect(storage.valores.has(CLAVE_CORRUPTO)).toBe(false);
   });
 });

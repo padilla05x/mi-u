@@ -10,6 +10,9 @@ const materia = (id: string, extra: Partial<Materia> = {}): Materia => ({
   clase: `https://meet.google.com/${id}`,
   moodle: `https://moodle.u.edu.co/${id}`,
   classroom: `https://classroom.google.com/${id}`,
+  tieneClaseAlterna: false,
+  claseAlterna: '',
+  claseAlternaNombre: '',
   ocultaEn: [],
   ...extra,
 });

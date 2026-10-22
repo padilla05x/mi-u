@@ -1,7 +1,7 @@
 import { esColorMateria, siguienteColor, type ColorMateria } from './colores.ts';
 import { nuevoId } from './datos.ts';
 import { aIsoBogota, esIsoBogota } from './fechas.ts';
-import type { Bloque, Datos, DiaSemana, DriveLink, Entrega, Materia, SeccionEnlace } from './tipos.ts';
+import type { Bloque, Datos, DiaSemana, DriveLink, EnlaceBloque, Entrega, Materia, SeccionEnlace } from './tipos.ts';
 
 export const CLAVE = 'mi-u-v1';
 export const CLAVE_CORRUPTO = 'mi-u-v1-corrupto';
@@ -104,7 +104,19 @@ function localStorageDelNavegador(): AlmacenWeb | null {
 
 function estadoInicial(): Datos {
   return {
-    materias: asignarColores(MATERIAS_BASE.map((nombre) => ({ id: nuevoId(), nombre, clase: '', moodle: '', classroom: '', ocultaEn: [] }))),
+    materias: asignarColores(
+      MATERIAS_BASE.map((nombre) => ({
+        id: nuevoId(),
+        nombre,
+        clase: '',
+        moodle: '',
+        classroom: '',
+        tieneClaseAlterna: false,
+        claseAlterna: '',
+        claseAlternaNombre: '',
+        ocultaEn: [],
+      })),
+    ),
     entregas: [],
     drive: [],
     horario: [],
@@ -145,16 +157,19 @@ export type Validacion = { ok: true; datos: Datos } | { ok: false; motivo: strin
 
 interface OpcionesValidacion {
   /**
-   * false al cargar de localStorage: un color de materia que no existe se reemplaza por uno libre, y un bloque del
-   * horario de una materia que ya no existe se descarta. true al importar un respaldo: en los dos casos el archivo se
-   * rechaza con su motivo. Si falta el color, siempre se asigna uno.
+   * false al cargar de localStorage, donde lo inconsistente se corrige: un color de materia que no existe se reemplaza
+   * por uno libre, un bloque de una materia que ya no existe se descarta, un bloque que usa el link alterno de una
+   * materia sin alterno vuelve al principal y una materia sin la casilla del alterno queda con el alterno vacío.
+   * true al importar un respaldo: en todos esos casos el archivo se rechaza con su motivo. Si falta el color, siempre
+   * se asigna uno.
    */
   estricto?: boolean;
 }
 
 /**
  * Reglas de los datos de Mi U, para la carga de localStorage y para importar respaldos. Migra el formato viejo
- * (fechas en milisegundos, materias sin color y sin ocultaEn, datos sin horario) y conserva los campos que no conoce.
+ * (fechas en milisegundos; materias sin color, sin ocultaEn o sin link alterno; datos sin horario; bloques sin enlace)
+ * y conserva los campos que no conoce.
  * Los bloques solapados se aceptan: solo los impide el formulario del horario.
  */
 export function validarDatos(valor: unknown, { estricto = false }: OpcionesValidacion = {}): Validacion {
@@ -177,7 +192,7 @@ export function validarDatos(valor: unknown, { estricto = false }: OpcionesValid
   if (motivo) return { ok: false, motivo };
   // Las cuatro listas ya pasaron sus reglas.
   const materias = (valor.materias as MateriaGuardada[]).map(migrarMateria);
-  const ids = new Set(materias.map((m) => m.id));
+  const porId = new Map(materias.map((m) => [m.id, m]));
   return {
     ok: true,
     datos: {
@@ -186,7 +201,10 @@ export function validarDatos(valor: unknown, { estricto = false }: OpcionesValid
       entregas: entregas as Entrega[],
       drive: valor.drive as DriveLink[],
       // Al cargar se descartan los bloques de materias que ya no existen; al importar ya se rechazaron arriba.
-      horario: (horario as Bloque[]).filter((b) => ids.has(b.materiaId)),
+      horario: (horario as BloqueGuardado[]).flatMap((b) => {
+        const materia = porId.get(b.materiaId);
+        return materia ? [migrarBloque(b, materia)] : [];
+      }),
     },
   };
 }
@@ -202,9 +220,32 @@ function asignarColores<T extends Record<string, unknown>>(materias: T[]): (T & 
   });
 }
 
-/** Las materias guardadas antes de poder quitarlas de una sección no traen ocultaEn: no están ocultas en ninguna. */
-function migrarMateria<T extends { ocultaEn?: SeccionEnlace[] }>(materia: T): T & { ocultaEn: SeccionEnlace[] } {
-  return { ...materia, ocultaEn: materia.ocultaEn ?? [] };
+/**
+ * Completa las materias de formatos anteriores: sin ocultaEn no están ocultas en ninguna sección, y sin los campos del
+ * link alterno no tienen uno. Sin la casilla del alterno, el alterno queda vacío (al importar, eso ya se rechazó).
+ */
+function migrarMateria(materia: MateriaGuardada) {
+  const tieneClaseAlterna = conAlterna(materia);
+  return {
+    ...materia,
+    ocultaEn: materia.ocultaEn ?? [],
+    tieneClaseAlterna,
+    claseAlterna: tieneClaseAlterna ? (materia.claseAlterna ?? '') : '',
+    claseAlternaNombre: tieneClaseAlterna ? (materia.claseAlternaNombre ?? '') : '',
+  };
+}
+
+/** Si la materia tiene link alterno. Los datos que no traen la casilla lo tienen si traen algún texto del alterno. */
+function conAlterna(materia: MateriaDeBloque): boolean {
+  return materia.tieneClaseAlterna ?? (Boolean(materia.claseAlterna) || Boolean(materia.claseAlternaNombre));
+}
+
+/**
+ * Los bloques de antes del link alterno no traen enlace: usan el principal. Al cargar, uno que usa el alterno de una
+ * materia sin alterno vuelve al principal (al importar, eso ya se rechazó).
+ */
+function migrarBloque(bloque: BloqueGuardado, materia: { tieneClaseAlterna: boolean }): Bloque {
+  return { ...bloque, enlace: bloque.enlace === 'alterno' && materia.tieneClaseAlterna ? 'alterno' : 'principal' };
 }
 
 /** mi-u.html guardaba la fecha en milisegundos; ahora es texto ISO con el desfase de Bogotá. */
@@ -277,11 +318,26 @@ const motivoSecciones = (valor: unknown) =>
 const esTexto = (valor: unknown) => typeof valor === 'string';
 const esBooleano = (valor: unknown) => typeof valor === 'boolean';
 
+/** Como motivoCampos, pero los campos que faltan se aceptan: son de formatos anteriores y se completan al migrar. */
+const motivoOpcionales = (valor: unknown, quien: string, reglas: Parameters<typeof motivoCampos>[2]) =>
+  motivoCampos(
+    valor,
+    quien,
+    reglas.map(([campos, cumple, falla]) => [campos.filter((c) => esObjeto(valor) && valor[c] !== undefined), cumple, falla]),
+  );
+
 /**
- * Una materia guardada. El color puede faltar (datos de mi-u.html) porque se asigna al cargar, y ocultaEn
- * (datos anteriores) porque empieza vacío; si está, solo puede nombrar las tres secciones de enlaces.
+ * Una materia guardada. El color puede faltar (datos de mi-u.html) porque se asigna al cargar; ocultaEn y los campos
+ * del link alterno (datos anteriores), porque se completan al migrar. Si ocultaEn está, solo puede nombrar las tres
+ * secciones de enlaces.
  */
-type MateriaGuardada = Omit<Materia, 'color' | 'ocultaEn'> & { color?: unknown; ocultaEn?: SeccionEnlace[] };
+type MateriaGuardada = Omit<Materia, 'color' | 'ocultaEn' | 'tieneClaseAlterna' | 'claseAlterna' | 'claseAlternaNombre'> & {
+  color?: unknown;
+  ocultaEn?: SeccionEnlace[];
+  tieneClaseAlterna?: boolean;
+  claseAlterna?: string;
+  claseAlternaNombre?: string;
+};
 
 function motivoMateria(valor: unknown, n: number, estricto: boolean): Motivo {
   const quien = cual('la materia', n, valor, 'nombre');
@@ -289,8 +345,16 @@ function motivoMateria(valor: unknown, n: number, estricto: boolean): Motivo {
   return (
     motivoCampos(valor, quien, [[['id', 'nombre', 'clase', 'moodle', 'classroom'], esTexto, 'no es texto']]) ??
     (tiene('ocultaEn') ? motivoCampos(valor, quien, [[['ocultaEn'], esListaDeSecciones, motivoSecciones]]) : null) ??
+    motivoOpcionales(valor, quien, [
+      [['claseAlterna', 'claseAlternaNombre'], esTexto, 'no es texto'],
+      [['tieneClaseAlterna'], esBooleano, 'no es verdadero o falso'],
+    ]) ??
     (estricto && tiene('color')
       ? motivoCampos(valor, quien, [[['color'], esColorMateria, (color) => `es ${JSON.stringify(color)}, que no es un color de Mi U`]])
+      : null) ??
+    // Con la casilla apagada no puede haber alterno (al cargar se vacía en migrarMateria).
+    (estricto && esObjeto(valor) && valor.tieneClaseAlterna === false && (valor.claseAlterna || valor.claseAlternaNombre)
+      ? `${conMayuscula(quien)} tiene link alterno, pero "tieneClaseAlterna" es falso.`
       : null)
   );
 }
@@ -310,12 +374,28 @@ function motivoDriveLink(valor: unknown, n: number): Motivo {
 /** "HH:MM" de 24 horas, de 00:00 a 23:59. */
 const esHora = (valor: unknown) => typeof valor === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
 const esDiaSemana = (valor: unknown): valor is DiaSemana => Number.isInteger(valor) && (valor as number) >= 0 && (valor as number) <= 6;
+const esEnlaceBloque = (valor: unknown): valor is EnlaceBloque => valor === 'principal' || valor === 'alterno';
+
+/** Un bloque guardado; el enlace puede faltar (datos anteriores al link alterno) porque se completa al migrar. */
+type BloqueGuardado = Omit<Bloque, 'enlace'> & { enlace?: EnlaceBloque };
+
+/** Lo que las reglas de un bloque necesitan de su materia: la de Mis materias o una guardada sin migrar. */
+interface MateriaDeBloque {
+  id: string;
+  nombre: string;
+  tieneClaseAlterna?: boolean;
+  claseAlterna?: string;
+  claseAlternaNombre?: string;
+}
 
 export interface ReglasBloque {
   /** Cómo se nombra en el motivo: "el bloque 2" en una lista, "el bloque" en el formulario. */
   quien: string;
-  materias: readonly { id: string; nombre: string }[];
-  /** Dónde debe estar su materia ("el archivo"), para el motivo si no existe; null si no se exige. */
+  materias: readonly MateriaDeBloque[];
+  /**
+   * Dónde debe estar su materia ("el archivo"), para el motivo si no existe; null si no se exige. Cuando se exige,
+   * un bloque que usa el link alterno también debe ser de una materia con alterno.
+   */
   dondeMateria: string | null;
   /** Exigir el id: los bloques guardados lo tienen; uno nuevo del formulario todavía no. */
   conId: boolean;
@@ -323,7 +403,8 @@ export interface ReglasBloque {
 
 /**
  * Reglas de un bloque del horario, compartidas por validarDatos y por el formulario (validarBloque en horario.ts):
- * materia de texto, día de 0 a 6, horas HH:MM, fin después de inicio y, si se pide, una materia que exista.
+ * materia de texto, día de 0 a 6, horas HH:MM, enlace "principal" o "alterno" (puede faltar en datos anteriores),
+ * fin después de inicio y, si se pide, una materia que exista y que tenga alterno si el bloque lo usa.
  * Devuelve el motivo del primer problema, o null. Los solapes no son de un bloque solo: los revisa validarBloque.
  */
 export function motivoBloque(valor: unknown, { quien: base, materias, dondeMateria, conId }: ReglasBloque): string | null {
@@ -335,9 +416,15 @@ export function motivoBloque(valor: unknown, { quien: base, materias, dondeMater
     [['inicio', 'fin'], esHora, 'no es una hora HH:MM de 00:00 a 23:59, como 08:00'],
   ]);
   if (motivo) return motivo;
-  const { inicio, fin, materiaId } = valor as Bloque;
+  const enlace = motivoOpcionales(valor, quien, [[['enlace'], esEnlaceBloque, 'no es "principal" ni "alterno"']]);
+  if (enlace) return enlace;
+  const { inicio, fin, materiaId } = valor as BloqueGuardado;
   // Con el formato HH:MM, comparar el texto compara las horas.
   if (fin <= inicio) return `${conMayuscula(quien)} debe terminar después de empezar: va de ${inicio} a ${fin}.`;
-  if (dondeMateria !== null && !materia) return `${conMayuscula(quien)} es de una materia que no está en ${dondeMateria} ("${materiaId}").`;
+  if (dondeMateria === null) return null;
+  if (!materia) return `${conMayuscula(quien)} es de una materia que no está en ${dondeMateria} ("${materiaId}").`;
+  if ((valor as BloqueGuardado).enlace === 'alterno' && !conAlterna(materia)) {
+    return `${conMayuscula(quien)} usa el link alterno, pero su materia no tiene uno.`;
+  }
   return null;
 }

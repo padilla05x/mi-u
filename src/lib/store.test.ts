@@ -140,7 +140,7 @@ describe('crearStore', () => {
   });
 
   it('deshacer quitar una materia restaura también sus bloques del horario', () => {
-    const horario = [{ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00' }];
+    const horario = [{ id: 'b1', materiaId: 'm1', dia: 0, inicio: '08:00', fin: '10:00', enlace: 'principal' }];
     const storage = storageFalso({
       [CLAVE]: JSON.stringify({
         materias: [{ id: 'm1', nombre: 'Física', color: 'orquidea', clase: '', moodle: '', classroom: '', ocultaEn: [] }],

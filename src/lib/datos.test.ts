@@ -3,7 +3,7 @@ import { moverMateria, quitarMateria } from './datos.ts';
 import type { Datos } from './tipos.ts';
 
 const datos: Datos = {
-  materias: ['a', 'b', 'c'].map((id) => ({ id, nombre: id, color: 'orquidea', clase: '', moodle: '', classroom: '', ocultaEn: [] })),
+  materias: ['a', 'b', 'c'].map((id) => ({ id, nombre: id, color: 'orquidea', clase: '', moodle: '', classroom: '', tieneClaseAlterna: false, claseAlterna: '', claseAlternaNombre: '', ocultaEn: [] })),
   entregas: [],
   drive: [],
   horario: [],
@@ -32,9 +32,9 @@ describe('quitarMateria', () => {
         { id: 'e2', materia: 'b', texto: 'Quiz', fecha: '2026-10-21T20:00:00-05:00', hecha: false, avisada: false },
       ],
       horario: [
-        { id: 'b1', materiaId: 'a', dia: 0, inicio: '08:00', fin: '10:00' },
-        { id: 'b2', materiaId: 'b', dia: 0, inicio: '10:00', fin: '12:00' },
-        { id: 'b3', materiaId: 'a', dia: 3, inicio: '14:00', fin: '16:00' },
+        { id: 'b1', materiaId: 'a', dia: 0, inicio: '08:00', fin: '10:00', enlace: 'principal' },
+        { id: 'b2', materiaId: 'b', dia: 0, inicio: '10:00', fin: '12:00', enlace: 'principal' },
+        { id: 'b3', materiaId: 'a', dia: 3, inicio: '14:00', fin: '16:00', enlace: 'principal' },
       ],
     };
     const nuevos = quitarMateria(conHorario, 'a');

@@ -16,7 +16,7 @@ const AHORA = new Date('2026-10-14T09:00:00-05:00');
 const materia = (
   id: string,
   nombre: string,
-  extra: Partial<Pick<Materia, 'clase' | 'moodle' | 'classroom' | 'ocultaEn'>> = {},
+  extra: Partial<Pick<Materia, 'clase' | 'moodle' | 'classroom' | 'ocultaEn' | 'tieneClaseAlterna' | 'claseAlterna' | 'claseAlternaNombre'>> = {},
 ): Materia => ({
   id,
   nombre,
@@ -24,6 +24,9 @@ const materia = (
   clase: '',
   moodle: '',
   classroom: '',
+  tieneClaseAlterna: false,
+  claseAlterna: '',
+  claseAlternaNombre: '',
   ocultaEn: [],
   ...extra,
 });
@@ -992,7 +995,14 @@ describe('Orden de materias y atajos', () => {
 
 describe('Hoy y Horario', () => {
   // AHORA es miércoles (dia 2) a las 9:00 en Bogotá.
-  const bloqueDe = (id: string, materiaId: string, dia: Bloque['dia'], inicio: string, fin: string): Bloque => ({ id, materiaId, dia, inicio, fin });
+  const bloqueDe = (id: string, materiaId: string, dia: Bloque['dia'], inicio: string, fin: string, enlace: Bloque['enlace'] = 'principal'): Bloque => ({
+    id,
+    materiaId,
+    dia,
+    inicio,
+    fin,
+    enlace,
+  });
   const conHorario = (horario: Bloque[]) => ({
     materias: [materia('fis', 'Física', { clase: 'meet.google.com/fis' }), materia('qui', 'Química'), materia('cal', 'Cálculo')],
     entregas: [],
@@ -1113,9 +1123,9 @@ describe('Hoy y Horario', () => {
     ]);
     expect(filaDelHorario('Química, lunes de 10:00 a 12:00')).toHaveTextContent('10:00–12:00');
     expect(guardado().horario).toEqual([
-      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '08:00', fin: '10:00' },
-      { id: expect.any(String), materiaId: 'qui', dia: 0, inicio: '10:00', fin: '12:00' },
-      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '06:00', fin: '07:00' },
+      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '08:00', fin: '10:00', enlace: 'principal' },
+      { id: expect.any(String), materiaId: 'qui', dia: 0, inicio: '10:00', fin: '12:00', enlace: 'principal' },
+      { id: expect.any(String), materiaId: 'fis', dia: 2, inicio: '06:00', fin: '07:00', enlace: 'principal' },
     ]);
     // Las horas se vacían; la materia y el día se quedan para la siguiente clase.
     expect(within(horario).getByLabelText('Inicio')).toHaveValue('');

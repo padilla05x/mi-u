@@ -44,7 +44,7 @@ export default function Horario({ horario, materias, onAgregar, onBorrar, classN
       mostrarError('Completa la hora de inicio y la de fin.');
       return;
     }
-    const nuevo: BloqueNuevo = { materiaId: materiaElegida, dia, inicio, fin };
+    const nuevo: BloqueNuevo = { materiaId: materiaElegida, dia, inicio, fin, enlace: 'principal' };
     const motivo = validarBloque(nuevo, horario, materias);
     if (motivo) {
       mostrarError(motivo);
