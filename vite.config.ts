@@ -7,6 +7,8 @@ import { defineConfig } from 'vitest/config';
 const puerto = { port: 5173, strictPort: true };
 
 export default defineConfig({
+  // GitHub Pages sirve la app en https://padilla05x.github.io/mi-u/; en local sigue en la raíz.
+  base: process.env.GITHUB_ACTIONS === 'true' ? '/mi-u/' : '/',
   plugins: [react(), tailwindcss()],
   server: puerto,
   preview: puerto,
